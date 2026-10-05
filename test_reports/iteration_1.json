@@ -1,0 +1,26 @@
+{
+  "summary": "Verified SEO/GEO implementation for Intrinsic app. All 4 checks pass: (1) Backend SEO endpoints — /api/sitemap.xml (valid XML, includes services/*, industries/*, about, contact), /api/robots.txt (explicitly allows GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot, Bingbot, Google-Extended + Sitemap: directive), /api/llms.txt (summary + page list), /api/seo (returns org data, PUT requires auth and succeeds with admin token). (2) Build prerender — 34 route index.html files present across build/services/* (21), build/industries/* (6), and 8 top-level routes; cybersecurity has correct title 'Cybersecurity Services | Intrinsic Technology', canonical https://intrinsicamerica.com/services/cybersecurity, JSON-LD with Service + BreadcrumbList, exactly 1 <h1>; healthcare has 'IT for Healthcare | Intrinsic Technology' and 1 <h1>; home has exactly 1 <h1>. (3) Live preview — homepage loads cleanly, no JS errors; client-side navigation updates <title> and renders unique <h1> per route. (4) Admin login at /admin works with provided credentials and admin workspace loads.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/services/cybersecurity (client-side)", "issues": ["Client-side document.title is 'Cybersecurity Services' (missing ' | Intrinsic Technology' suffix). Prerendered static HTML (what crawlers see) is correct with full suffix, so SEO is unaffected. Cosmetic issue only — SeoContext/head.js should append brand suffix for parity with build output."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_seo_endpoints.py", "/app/test_reports/pytest/seo_results.xml"],
+  "action_items": ["(Optional) Make client-side title include brand suffix to match prerendered titles — e.g., cybersecurity should render as 'Cybersecurity Services | Intrinsic Technology' in the browser tab (currently just 'Cybersecurity Services')."],
+  "critical_code_review_comments": [
+    "Prerender script correctly injects per-route title, canonical, JSON-LD (Service + BreadcrumbList) and ensures a single <h1>; noscript block removed from public/index.html as required.",
+    "Robots.txt whitelists all required AI crawlers and references the sitemap — good GEO posture.",
+    "Minor parity gap: client-side SEO manager does not append the ' | Intrinsic Technology' suffix for some routes (e.g., /services/cybersecurity) while the prerendered HTML does. Crawlers see the correct title; only the browser tab differs."
+  ],
+  "updated_files": ["/app/backend/tests/test_seo_endpoints.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100%"},
+  "test_credentials": "admin@intrinsictg.com / 080b308a140ae894077cebae (works)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend SEO suite at /app/backend/tests/test_seo_endpoints.py covers sitemap/robots/llms/seo + admin auth + PUT. All 34 prerendered route index.html files exist. Only cosmetic issue: client-side title missing brand suffix on some routes — prerendered HTML (crawler-facing) is correct.",
+  "rca of the issue": "N/A — all required SEO/GEO fixes are in place."
+}

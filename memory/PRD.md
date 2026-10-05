@@ -1,52 +1,30 @@
-# Intrinsic Technology — PRD
+# Intrinsic Technology — Website & CMS (React + FastAPI + MongoDB)
 
-## Original problem statement
-Port the user's existing "Intrinsic" project (uploaded zip, React + FastAPI + MongoDB marketing site + admin CMS) into this platform, run it end-to-end in preview, then publish. Also: import the user's real site-content export and make it persist in code so GitHub pushes/deploys carry it (no repeated import/export).
+## Problem Statement
+Production deploy + SEO/GEO hardening of "Intrinsic" — a marketing/CMS site for Intrinsic Technology Group (a women/minority-owned MSP in NYC offering Managed IT, Cybersecurity, Cloud, AI). User supplied a third-party SEO/GEO assessment PDF and asked to verify/complete all fixes so the site performs for both classic SEO and Generative Engine Optimization (visibility to AI crawlers).
 
 ## Architecture
-- Frontend: React (CRA + CRACO), Tailwind, framer-motion, shadcn/ui. 40+ marketing pages + admin CMS. API via REACT_APP_BACKEND_URL + /api. Admin JWT token in localStorage['intr_token'].
-- Backend: FastAPI + Motor (MongoDB). JWT admin auth, Emergent object storage for uploads, managed Resend + Gmail SMTP for inquiry email (pending key), analytics, live visual edits, typography/custom-css, full export/import migration.
-- Env (backend/.env): MONGO_URL, DB_NAME, CORS_ORIGINS, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, EMERGENT_LLM_KEY, INQUIRY_NOTIFY_EMAIL.
+- Frontend: React 19 (CRA via craco), react-router 7, Tailwind/shadcn UI.
+- Backend: FastAPI + Motor (async MongoDB), JWT admin auth, emergent object storage, emergentintegrations LLM key.
+- DB: MongoDB (local in preview). Auto-seeds admin + restores content from backend/seed_data/site_export.json on fresh DB.
 
-## Admin credentials
-admin@intrinsicamerica.com / IntrinsicAdmin2026! (env-seeded; see memory/test_credentials.md). Two original imported admins (admin@intrinsic.com, admin@intrinsic.io) also exist with unknown hashed passwords — harmless.
+## Setup Notes
+- backend/.env: MONGO_URL, DB_NAME, CORS_ORIGINS, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, EMERGENT_LLM_KEY.
+- Admin seeded from ADMIN_EMAIL/ADMIN_PASSWORD (see test_credentials.md). Password not reset on restart.
 
-## Implemented (with dates)
-- 2026-06: Ported uploaded Intrinsic code into /app; wired env; installed tinycss2/pillow/httpx; services healthy. Verified 100% backend (17 tests) + 100% frontend (admin login, inquiry write->DB->admin read, object storage, SEO/discovery endpoints).
-- 2026-06: Global section-padding rhythm — public content sections keep their total vertical padding but re-split 65% top / 35% bottom; hero sections bottom-aligned with breathing room. Scoped CSS in frontend/src/index.css (.page-in section.py-* + hero align-content:end). Admin/navbar/modals untouched; inter-section gaps preserved.
-- 2026-06: Imported user's real site export (intrinsic-site-export-20261002) into live DB via /api/admin/import — 1183 records + 17 files restored. Made it persist in code: baked trimmed bundle to backend/seed_data/site_export.json (blogs, case_studies, files, jobs, live_edits, service_briefs, settings, site, testimonials + 17 file binaries). Added seed_from_export() that auto-restores on a FRESH DB; guarded legacy demo seed (is_fresh check) so it never overwrites real content. Users/analytics/leads intentionally not baked (env admin + fresh analytics). Verified: real content live, images serve 200, env-admin login works. seed_data NOT gitignored → ships on GitHub push.
+## SEO / GEO — Implemented (verified June 2026)
+- Static Organization / ProfessionalService(LocalBusiness) / WebSite JSON-LD @graph in public/index.html.
+- Per-route client meta engine (src/lib/SeoContext.jsx + head.js): title, description, keywords, canonical, OG, Twitter, JSON-LD (Service, BreadcrumbList, FAQPage, Article/BlogPosting).
+- Backend: GET /api/seo (+PUT admin), /api/sitemap.xml (current routes + published blog/case-study/career slugs), /api/robots.txt (allows GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot, Bingbot, Google-Extended + Sitemap), /api/llms.txt, dynamic /api/og/{coll}/{slug}.png social images.
+- Animated counters (CountUp) start at the real value, not 0 (assessment Finding 7).
+- **NEW — build-time prerender** (frontend/scripts/prerender.cjs, wired as `postbuild`): writes 34 per-route static index.html files with correct per-page title, description, canonical, OG/Twitter, per-route JSON-LD (Service + BreadcrumbList) and answer-first content — fixes assessment Findings 1, 2, 8, 9 (client-side rendering left per-route HTML generic for non-JS/AI crawlers). Global <noscript> block removed so each route has a single accurate <h1>.
+- Testing agent: 100% backend (6/6), 100% frontend. Backend SEO suite at backend/tests/test_seo_endpoints.py.
 
-## Backlog / remaining
-- P2: Email delivery (Resend/SMTP) pending — needs EMERGENT_EMAIL_KEY or Gmail app password + recipient. Inquiries still persist and appear in admin; only outbound email is skipped.
-- P0 (user action): Publish to a live URL — separate explicit deploy step (first deploy = 50 ECU), pending user confirmation.
+## Status
+- App installed into /app, services running, `/api/health` ok. First production deploy was prepared and is pending the user's 50-ECU first-deploy confirmation.
 
-## Next tasks
-- Deploy/publish when user confirms.
-- Wire live email when key provided.
-
-## 2026-06 — Hero reveal fix + responsive sweep (job intrinsic-deploy-1)
-- Bug: hero-section images on several pages popped in suddenly (old `.hero-wipe` was a mount-time @keyframes that finished before the element scrolled into view / before the image decoded).
-- Fix: new `src/components/HeroWipe.jsx` (IntersectionObserver + image-decode wait + 4s safety) reveals `.hero-wipe` via `.hw-in`; `index.css` `.hero-wipe` is now a scroll-triggered clip-path transition (left-to-right), matching `ImageReveal`. `AutoReveal` now skips `.hero-wipe`.
-- Verified by testing agent (iteration_5): all 9 hero-wipe elements across 8 routes end fully revealed; zero horizontal overflow across 13 routes at 390/768/1280/1920. 100% frontend pass.
-
-## 2026-06 — Full-site QA sweep (pre-GitHub)
-- Testing agent (iteration_6): all 41 routes × 4 viewports (390/768/1280/1920) = 164 combos. Zero console/script errors, zero failed requests, zero broken images, zero horizontal overflow. Admin login + /admin verified. 100% pass. No fixes needed.
-
-## 2026-06 — Full-viewport heroes on industry/sub pages
-- Bug: industry pages + sub-pages (fin/hc/construction/np/ps + air-readiness + generic industry-hero) had short heroes; next section appeared before the fold.
-- Cause: an index.css override forced `min-height:0; display:block` on :is([data-testid=fin-hero],hc-hero,construction-hero,np-hero,ps-hero,industry-hero,air-hero), opting them out of the site-wide `.page-in main > section:first-child { min-height:100svh/var(--z); display:grid; align-content:center }` treatment.
-- Fix: removed that override block. All heroes now fill the full viewport like the homepage.
-- Verified by testing agent (iteration_7): 14/14 hero-height checks (>= innerHeight) at 1920/1280; 44/44 overflow checks across 11 routes x 4 viewports. 100% pass.
-
-## 2026-06 — SEO / GEO hardening (from intrinsicamerica SEO & GEO assessment)
-Fixed in code (verified by testing agent iteration_9, 100%):
-- Non-JS crawler visibility: public/index.html now ships meta description, Open Graph, Twitter cards, a rich <noscript> fallback (services + NAP + internal links), and inline JSON-LD @graph (Organization, ProfessionalService/LocalBusiness, WebSite) — so Bing/ChatGPT/Claude/Perplexity get real content + facts without JS.
-- Structured data: per-page JSON-LD adds BreadcrumbList (all non-home) + Service (/services/*) + FAQPage (home); shared @id dedupes with static. head.js clears stale tags so exactly ONE canonical/description/og per route.
-- robots.txt + llms.txt at site ROOT (+ /api versions) explicitly allow GPTBot/OAI-SearchBot/ClaudeBot/PerplexityBot/Bingbot/Google-Extended; llms.txt lists key pages.
-- backend DEFAULT_SEO: canonical_base=https://intrinsicamerica.com, full org NAP (14 Wall Street Suite 5C, NY 10005; +1-212-643-4808; consulting@intrinsicamerica.com), 5 FAQs. sitemap uses prod domain.
-- NAP already consistent in new site (NY HQ, Paterson NJ fixed, Boston, DC); counter (CountUp) hardened to render real value (component currently unused — no live 0-bug).
-
-Remaining = hosting/ops (NOT code), to do on the real domain at deploy:
-- Long-term: SSR/prerender (Next.js/Astro) or a prerender layer for full crawler parity (short-term noscript+schema done).
-- 301 legacy URLs from old site; 301 www -> non-www; retire old indexed content.
-- Register Bing Webmaster Tools + Google Business Profile; set google_site_verification in SEO settings.
+## Backlog / Not in codebase (require owner action, out of app scope)
+- P1: 301 redirect map for legacy URLs; choose canonical www vs non-www at the host/DNS layer.
+- P1: Register Bing Webmaster Tools + IndexNow; claim Google Business Profile per office.
+- P2: Dynamic detail pages (blog/case-study/career slugs) are not statically prerendered — they rely on client-side schema + are in the sitemap; add to prerender if AI indexing of those specific URLs is needed.
+- P2: Additional location-specific pages (NJ/Boston/DC) and expanded FAQ content for GEO.
