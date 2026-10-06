@@ -249,6 +249,11 @@ async function dynamicRoutes() {
   return routes;
 }
 
+async function fetchSeo() {
+  if (!API) return null;
+  return await fetchJson(`${API}/seo`);
+}
+
 async function main() {
   const indexPath = path.join(BUILD_DIR, "index.html");
   if (!fs.existsSync(indexPath)) {
@@ -256,6 +261,16 @@ async function main() {
     process.exit(1);
   }
   const template = fs.readFileSync(indexPath, "utf8");
+
+  // Enrich the home route with FAQPage schema + visible FAQ content (assessment #8/#9).
+  const seo = await fetchSeo();
+  const faqs = ((seo && seo.geo && seo.geo.faqs) || []).filter((f) => f && f.q && f.a);
+  const home = ROUTES.find((r) => r.home);
+  if (home && faqs.length) {
+    home.extraLd = [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }];
+    const faqHtml = faqs.map((f) => `<div><h3>${esc(f.q)}</h3><p>${esc(f.a)}</p></div>`).join("");
+    home.bodyHtml = `<p>Intrinsic Technology is a women-owned and minority-owned managed service provider (MSP) in New York City serving healthcare, financial services, legal, construction, and nonprofit organizations. <a href="/contact">Talk to an expert</a>.</p><section aria-label="Frequently Asked Questions"><h2>Frequently Asked Questions</h2>${faqHtml}</section>`;
+  }
 
   let staticCount = 0;
   for (const route of ROUTES) { writeRoute(template, route); staticCount++; }
