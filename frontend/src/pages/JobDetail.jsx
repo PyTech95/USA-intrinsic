@@ -5,7 +5,39 @@ import Footer from "../components/Footer";
 import { ScrollProgress, Reveal } from "../components/common";
 import { ArrowLeft, ArrowRight, MapPin, Briefcase, Tag, CheckCircle2, Upload, Loader2, Check } from "lucide-react";
 import { BACKEND, errMsg, api } from "../lib/api";
+import { usePageSeo } from "../lib/SeoContext";
 import axios from "axios";
+
+const EMP_TYPE = { "full time": "FULL_TIME", "full-time": "FULL_TIME", "part time": "PART_TIME", "part-time": "PART_TIME", contract: "CONTRACTOR", contractor: "CONTRACTOR", internship: "INTERN", temporary: "TEMPORARY" };
+
+function jobPostingLd(job) {
+  const base = "https://intrinsicamerica.com";
+  const parts = [job.overview, ...(job.responsibilities || []), ...(job.requirements || [])].filter(Boolean);
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: job.title,
+    description: parts.join(" "),
+    datePosted: job.created_at || undefined,
+    employmentType: EMP_TYPE[String(job.type || "").toLowerCase().trim()] || "FULL_TIME",
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "Intrinsic Technology",
+      sameAs: base,
+      logo: base + "/favicon-512.png",
+    },
+    directApply: true,
+  };
+  const loc = String(job.location || "");
+  if (/remote|telecommute/i.test(loc)) {
+    ld.jobLocationType = "TELECOMMUTE";
+    ld.applicantLocationRequirements = { "@type": "Country", name: "USA" };
+  } else {
+    const [city, region] = loc.replace(/^hybrid[\s—-]*/i, "").split(",").map((s) => s.trim());
+    ld.jobLocation = { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: city || "New York", addressRegion: region || "NY", addressCountry: "US" } };
+  }
+  return ld;
+}
 
 const Section = ({ title, items }) => (
   <div className="mt-8">
@@ -27,6 +59,14 @@ const JobDetail = () => {
   useEffect(() => {
     api.get("/content/jobs").then(({ data }) => setJob(data.find((j) => j.slug === slug && j.published !== false) || null)).catch(() => setJob(null));
   }, [slug]);
+
+  usePageSeo(job ? {
+    title: job.title,
+    description: (job.overview || `Open role at Intrinsic Technology: ${job.title}. ${job.type || ""} ${job.location || ""}`).slice(0, 180),
+    keywords: `${job.title}, ${job.category || "careers"}, Intrinsic Technology jobs`,
+    type: "article",
+    jsonLd: [jobPostingLd(job)],
+  } : null);
 
   const [form, setForm] = useState({ name: "", email: "", phone: "", cover_letter: "" });
   const [file, setFile] = useState(null);

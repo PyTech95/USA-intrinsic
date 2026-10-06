@@ -208,6 +208,15 @@ function App() {
           <Route path="/industries/:slug" element={<IndustryPage />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          {/* Legacy URL redirects (crawler 301s handled by prerendered stubs) */}
+          <Route path="/about-us" element={<Navigate to="/about" replace />} />
+          <Route path="/help-desk-support" element={<Navigate to="/services/managed-it" replace />} />
+          <Route path="/healthcare" element={<Navigate to="/industries/healthcare" replace />} />
+          <Route path="/terms-conditions" element={<Navigate to="/terms-of-service" replace />} />
+          <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
+          <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
+          <Route path="/jobs" element={<Navigate to="/careers" replace />} />
+          <Route path="/jobs/:slug" element={<Navigate to="/careers" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>

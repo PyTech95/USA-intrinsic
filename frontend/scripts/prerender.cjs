@@ -2,26 +2,40 @@
  * Build-time prerender (no headless browser).
  * Writes per-route static HTML so non-JS crawlers (Bing, GPTBot, ClaudeBot,
  * PerplexityBot, link-preview bots) see the correct title, meta, canonical,
- * Open Graph/Twitter tags, JSON-LD and answer-first content for EVERY route
- * instead of the generic homepage shell. The React app still boots normally
- * for real users (createRoot replaces the prerendered #root content).
+ * Open Graph/Twitter tags, JSON-LD and answer-first content for EVERY public
+ * page instead of the generic homepage shell.
  *
- * Directly addresses the SEO/GEO assessment findings:
- *   #1 client-side rendering leaves initial HTML empty
- *   #2 per-page titles / meta / social tags missing from HTML
- *   #8 structured data missing per page
- *   #9 content not structured for AI answers
+ * Covers: static routes, legacy-URL redirect stubs (301-style via canonical +
+ * meta-refresh), and dynamic detail pages (case studies, published blog posts,
+ * open job postings) fetched best-effort from the backend API at build time.
+ *
+ * Addresses SEO/GEO assessment: client-side rendering empty HTML (#1),
+ * per-page meta/titles (#2), legacy 301 redirects (#3), structured data (#8),
+ * content for AI answers (#9).
  */
 const fs = require("fs");
 const path = require("path");
 
 const BUILD_DIR = path.resolve(__dirname, "..", "build");
 const BASE = (process.env.PRERENDER_BASE_URL || "https://intrinsicamerica.com").replace(/\/+$/, "");
-const SITE_NAME = "Intrinsic Technology";
 const TITLE_TMPL = "{title} | Intrinsic Technology";
-const OG_IMAGE = BASE + "/favicon-512.png";
 
-// Source of truth for per-route SEO copy (mirrors src/lib/seoRoutes.js).
+// Backend API base for best-effort dynamic fetch (build time).
+function readApiBase() {
+  if (process.env.PRERENDER_API_URL) return process.env.PRERENDER_API_URL.replace(/\/+$/, "");
+  try {
+    const env = fs.readFileSync(path.resolve(__dirname, "..", ".env"), "utf8");
+    const m = env.match(/^REACT_APP_BACKEND_URL\s*=\s*(.+)$/m);
+    if (m) return m[1].trim().replace(/\/+$/, "") + "/api";
+  } catch (e) {}
+  return "";
+}
+const API = readApiBase();
+
+const slugify = (s = "") => s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const titleCase = (seg) => seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 const ROUTES = [
   { path: "/", label: "Home", title: "Managed IT, Cybersecurity & Cloud Services", description: "Complete oversight of your technology environment—proactive monitoring, infrastructure management, and strategic guidance to keep operations secure and resilient.", home: true },
   { path: "/about", label: "About Us", title: "About Intrinsic Technology", description: "A women-owned and minority-owned managed service provider in New York City delivering accountable, coordinated technology services." },
@@ -59,8 +73,19 @@ const ROUTES = [
   { path: "/industries/healthcare", label: "Healthcare", title: "IT for Healthcare", description: "HIPAA-aligned managed IT and security for healthcare providers." },
 ];
 
-const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const titleCase = (seg) => seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// Legacy URL -> current URL (assessment Finding #3). Served to crawlers as
+// canonical + meta-refresh + JS redirect from a static stub at build/<old>/.
+const REDIRECTS = {
+  "/about-us": "/about",
+  "/help-desk-support": "/services/managed-it",
+  "/healthcare": "/industries/healthcare",
+  "/terms-conditions": "/terms-of-service",
+  "/privacy": "/privacy-policy",
+  "/contact-us": "/contact",
+  "/jobs": "/careers",
+};
+
+const EMP_TYPE = { "full time": "FULL_TIME", "full-time": "FULL_TIME", "part time": "PART_TIME", "part-time": "PART_TIME", contract: "CONTRACTOR", contractor: "CONTRACTOR", internship: "INTERN", temporary: "TEMPORARY" };
 
 function breadcrumbLd(route) {
   const parts = route.path.split("/").filter(Boolean);
@@ -69,7 +94,7 @@ function breadcrumbLd(route) {
   parts.forEach((seg, i) => {
     acc += "/" + seg;
     const def = ROUTES.find((r) => r.path === acc);
-    items.push({ "@type": "ListItem", position: i + 2, name: (def && def.label) || titleCase(seg), item: BASE + acc });
+    items.push({ "@type": "ListItem", position: i + 2, name: (def && def.label) || route.crumbName || titleCase(seg), item: BASE + acc });
   });
   return { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items };
 }
@@ -78,21 +103,12 @@ function routeJsonLd(route) {
   const out = [];
   if (!route.home) out.push(breadcrumbLd(route));
   if (route.path.startsWith("/services/")) {
-    out.push({
-      "@context": "https://schema.org",
-      "@type": "Service",
-      name: route.title,
-      description: route.description,
-      serviceType: route.title,
-      provider: { "@id": BASE + "/#organization" },
-      areaServed: "US",
-      url: BASE + route.path,
-    });
+    out.push({ "@context": "https://schema.org", "@type": "Service", name: route.title, description: route.description, serviceType: route.title, provider: { "@id": BASE + "/#organization" }, areaServed: "US", url: BASE + route.path });
   }
+  (route.extraLd || []).forEach((l) => l && out.push(l));
   return out;
 }
 
-// Answer-first visible content for crawlers; React replaces #root on client load.
 function contentBlock(route) {
   const crumbs = (() => {
     if (route.home) return "";
@@ -102,18 +118,19 @@ function contentBlock(route) {
     parts.forEach((seg) => {
       acc += "/" + seg;
       const def = ROUTES.find((r) => r.path === acc);
-      links.push(`<a href="${acc}">${esc((def && def.label) || titleCase(seg))}</a>`);
+      links.push(`<a href="${acc}">${esc((def && def.label) || route.crumbName || titleCase(seg))}</a>`);
     });
     return `<nav aria-label="Breadcrumb">${links.join(" / ")}</nav>`;
   })();
   const primaryLinks = ROUTES.filter((r) => ["/services/managed-it", "/services/cybersecurity", "/services/cloud", "/services/ai", "/services/vcio-vciso", "/industries", "/about", "/contact"].includes(r.path))
     .map((r) => `<li><a href="${r.path}">${esc(r.label)}</a></li>`).join("");
+  const extra = route.bodyHtml || `<p>Intrinsic Technology is a women-owned and minority-owned managed service provider (MSP) in New York City serving healthcare, financial services, legal, construction, and nonprofit organizations. <a href="/contact">Talk to an expert</a>.</p>`;
   return `
       <main>
         ${crumbs}
         <h1>${esc(route.title)}</h1>
         <p>${esc(route.description)}</p>
-        <p>Intrinsic Technology is a women-owned and minority-owned managed service provider (MSP) in New York City serving healthcare, financial services, legal, construction, and nonprofit organizations. <a href="/contact">Talk to an expert</a>.</p>
+        ${extra}
         <nav aria-label="Primary"><ul>${primaryLinks}</ul></nav>
       </main>`;
 }
@@ -122,44 +139,139 @@ function renderRoute(template, route) {
   const canonical = BASE + route.path;
   const fullTitle = route.home ? "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services" : TITLE_TMPL.replace("{title}", route.title);
   let html = template;
-
-  // <title>
   html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(fullTitle)}</title>`);
-  // description
   html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${esc(route.description)}" />`);
-  // Open Graph + Twitter title/description/url
   html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${esc(fullTitle)}" />`);
   html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${esc(route.description)}" />`);
   html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${esc(canonical)}" />`);
   html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${esc(fullTitle)}" />`);
   html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${esc(route.description)}" />`);
-
-  // Inject canonical + per-route JSON-LD before </head>
+  if (route.ogImage) {
+    html = html.replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${esc(route.ogImage)}" />`);
+    html = html.replace(/<meta name="twitter:image"[^>]*>/, `<meta name="twitter:image" content="${esc(route.ogImage)}" />`);
+  }
   const extraLd = routeJsonLd(route).map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n");
-  const headInject = `<link rel="canonical" href="${esc(canonical)}" data-prerender="1" />\n${extraLd}\n</head>`;
-  html = html.replace("</head>", headInject);
-
-  // Inject crawler-visible content into #root (replaced by React for real users)
+  html = html.replace("</head>", `<link rel="canonical" href="${esc(canonical)}" data-prerender="1" />\n${extraLd}\n</head>`);
   html = html.replace(/<div id="root">\s*<\/div>/, `<div id="root">${contentBlock(route)}</div>`);
   return html;
 }
 
-function main() {
+function renderRedirect(template, from, to) {
+  const target = BASE + to;
+  let html = template;
+  html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>Redirecting… | Intrinsic Technology</title>`);
+  const head = `<link rel="canonical" href="${esc(target)}" data-prerender="1" />\n<meta http-equiv="refresh" content="0; url=${esc(to)}" />\n<meta name="robots" content="noindex, follow" />\n<script>window.location.replace(${JSON.stringify(to)});</script>\n</head>`;
+  html = html.replace("</head>", head);
+  html = html.replace(/<div id="root">\s*<\/div>/, `<div id="root"><main><p>This page has moved. Redirecting to <a href="${esc(to)}">${esc(target)}</a>.</p></main></div>`);
+  return html;
+}
+
+function writeRoute(template, route) {
+  const html = renderRoute(template, route);
+  const outDir = route.home ? BUILD_DIR : path.join(BUILD_DIR, route.path);
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "index.html"), html, "utf8");
+}
+
+async function fetchJson(url) {
+  if (typeof fetch !== "function" || !API) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function dynamicRoutes() {
+  const routes = [];
+  if (!API) {
+    console.log("[prerender] no API base — skipping dynamic (case studies / blog / jobs) pages");
+    return routes;
+  }
+  const [caseStudies, blogs, jobs] = await Promise.all([
+    fetchJson(`${API}/content/case-studies`),
+    fetchJson(`${API}/content/blogs`),
+    fetchJson(`${API}/content/jobs`),
+  ]);
+
+  (caseStudies || []).forEach((c) => {
+    const slug = slugify(c.title || "");
+    if (!slug) return;
+    const title = c.seo_title || c.title;
+    const description = (c.seo_description || c.geo_summary || c.summary || String(c.body || "").slice(0, 180) || "Client case study from Intrinsic Technology.").slice(0, 300);
+    routes.push({
+      path: `/case-studies/${slug}`, title, description, crumbName: "Case Studies",
+      ogImage: c.og_image ? c.og_image : `${API}/og/case-studies/${slug}.png`,
+      bodyHtml: `<p>${esc(String(c.body || "").slice(0, 600))}</p>`,
+      extraLd: [{ "@context": "https://schema.org", "@type": "Article", headline: title, description, image: c.og_image || `${API}/og/case-studies/${slug}.png`, author: { "@type": "Organization", name: "Intrinsic Technology" }, publisher: { "@type": "Organization", name: "Intrinsic Technology" }, articleSection: c.tag || undefined, mainEntityOfPage: BASE + `/case-studies/${slug}` }],
+    });
+  });
+
+  (blogs || []).forEach((b) => {
+    const slug = slugify(b.title || "");
+    if (!slug) return;
+    const title = b.seo_title || b.title;
+    const description = (b.seo_description || b.geo_summary || b.excerpt || String(b.content || "").slice(0, 180) || "Insight from Intrinsic Technology.").slice(0, 300);
+    routes.push({
+      path: `/blog/${slug}`, title, description, crumbName: "Resources",
+      ogImage: b.og_image ? b.og_image : `${API}/og/blogs/${slug}.png`,
+      bodyHtml: `<p>${esc(b.excerpt || "")}</p>`,
+      extraLd: [{ "@context": "https://schema.org", "@type": "BlogPosting", headline: title, description, image: b.og_image || `${API}/og/blogs/${slug}.png`, author: { "@type": "Person", name: b.author || "Intrinsic Technology" }, publisher: { "@type": "Organization", name: "Intrinsic Technology" }, articleSection: b.category || undefined, mainEntityOfPage: BASE + `/blog/${slug}` }],
+    });
+  });
+
+  (jobs || []).filter((j) => j.published !== false && j.slug).forEach((j) => {
+    const descParts = [j.overview, ...(j.responsibilities || []), ...(j.requirements || [])].filter(Boolean);
+    const description = (j.overview || `Open role: ${j.title}`).slice(0, 300);
+    const ld = {
+      "@context": "https://schema.org", "@type": "JobPosting", title: j.title,
+      description: descParts.join(" "), datePosted: j.created_at || undefined,
+      employmentType: EMP_TYPE[String(j.type || "").toLowerCase().trim()] || "FULL_TIME",
+      hiringOrganization: { "@type": "Organization", name: "Intrinsic Technology", sameAs: BASE, logo: BASE + "/favicon-512.png" },
+      directApply: true,
+    };
+    const loc = String(j.location || "");
+    if (/remote|telecommute/i.test(loc)) { ld.jobLocationType = "TELECOMMUTE"; ld.applicantLocationRequirements = { "@type": "Country", name: "USA" }; }
+    else { const [city, region] = loc.replace(/^hybrid[\s—-]*/i, "").split(",").map((s) => s.trim()); ld.jobLocation = { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: city || "New York", addressRegion: region || "NY", addressCountry: "US" } }; }
+    routes.push({
+      path: `/careers/${j.slug}`, title: j.title, description, crumbName: "Careers",
+      bodyHtml: `<p><strong>${esc(j.type || "")}</strong> · ${esc(j.location || "")}</p><p>${esc(descParts.slice(0, 4).join(" ").slice(0, 600))}</p><p><a href="/careers/${j.slug}#apply">Apply for this position</a></p>`,
+      extraLd: [ld],
+    });
+  });
+
+  return routes;
+}
+
+async function main() {
   const indexPath = path.join(BUILD_DIR, "index.html");
   if (!fs.existsSync(indexPath)) {
     console.error("[prerender] build/index.html not found — run after craco build");
     process.exit(1);
   }
   const template = fs.readFileSync(indexPath, "utf8");
-  let count = 0;
-  for (const route of ROUTES) {
-    const html = renderRoute(template, route);
-    const outDir = route.home ? BUILD_DIR : path.join(BUILD_DIR, route.path);
+
+  let staticCount = 0;
+  for (const route of ROUTES) { writeRoute(template, route); staticCount++; }
+
+  let redirectCount = 0;
+  for (const [from, to] of Object.entries(REDIRECTS)) {
+    const outDir = path.join(BUILD_DIR, from);
     fs.mkdirSync(outDir, { recursive: true });
-    fs.writeFileSync(path.join(outDir, "index.html"), html, "utf8");
-    count++;
+    fs.writeFileSync(path.join(outDir, "index.html"), renderRedirect(template, from, to), "utf8");
+    redirectCount++;
   }
-  console.log(`[prerender] wrote ${count} route HTML files to build/`);
+
+  let dynCount = 0;
+  const dyn = await dynamicRoutes();
+  for (const route of dyn) { writeRoute(template, route); dynCount++; }
+
+  console.log(`[prerender] static=${staticCount} redirects=${redirectCount} dynamic=${dynCount} (total pages=${staticCount + dynCount})`);
 }
 
 main();
