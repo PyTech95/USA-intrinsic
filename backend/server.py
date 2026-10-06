@@ -17,7 +17,8 @@ import jwt
 import bcrypt
 import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Header, Response, BackgroundTasks, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
+import ssr_render
 from starlette.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -540,6 +541,7 @@ SEO_STATIC_ROUTES = [
     "/services/microsoft-365", "/services/vcio-vciso",
     "/industries", "/industries/construction", "/industries/professional-services",
     "/industries/financial-services", "/industries/non-profit", "/industries/healthcare",
+    "/service-areas/new-york", "/service-areas/new-jersey",
 ]
 
 DEFAULT_SEO = {
@@ -549,7 +551,7 @@ DEFAULT_SEO = {
     "default_description": "Intrinsic Technology delivers Managed IT, Cybersecurity, and Cloud services—engineered, monitored, and secured for business. 24/7 monitoring, complete accountability, and one trusted technology partner.",
     "default_keywords": "Managed IT, Cybersecurity, Cloud Services, Microsoft 365, AI Automation, IT Support, Threat Detection, Cloud Migration, Compliance",
     "canonical_base": "https://intrinsicamerica.com",
-    "default_og_image": "/favicon-512.png",
+    "default_og_image": "/api/og/default.png",
     "twitter_handle": "",
     "google_site_verification": "",
     "robots_default": "index, follow",
@@ -672,6 +674,58 @@ async def llms_txt(request: Request):
             if f.get("q"):
                 out += [f"### {f['q']}", (f.get("a") or ""), ""]
     return PlainTextResponse("\n".join(out))
+
+# ---- Server-side rendering for public pages (SSR; always fresh from DB) ----
+_SSR_TEMPLATE_CACHE = {"mtime": 0, "html": None}
+
+def _frontend_index_path() -> Path:
+    override = os.environ.get("FRONTEND_BUILD_DIR")
+    candidates = [Path(override) / "index.html"] if override else []
+    candidates += [ROOT_DIR.parent / "frontend" / "build" / "index.html",
+                   Path("/var/www/intrinsic/current/frontend/build/index.html")]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[-1]
+
+def _load_ssr_template() -> str | None:
+    path = _frontend_index_path()
+    try:
+        mtime = path.stat().st_mtime
+        if _SSR_TEMPLATE_CACHE["html"] is None or mtime != _SSR_TEMPLATE_CACHE["mtime"]:
+            _SSR_TEMPLATE_CACHE["html"] = path.read_text(encoding="utf-8")
+            _SSR_TEMPLATE_CACHE["mtime"] = mtime
+        return _SSR_TEMPLATE_CACHE["html"]
+    except Exception as e:
+        logger.error(f"SSR template load failed ({path}): {e}")
+        return None
+
+@api_router.get("/ssr")
+async def ssr_page(request: Request):
+    """Render a public page's full HTML. nginx proxies HTML requests here on the
+    VPS (X-Original-URI); ?path= is accepted for direct testing."""
+    path = request.headers.get("x-original-uri") or request.query_params.get("path") or "/"
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    template = _load_ssr_template()
+    if not template:
+        raise HTTPException(status_code=503, detail="Frontend build not available for SSR")
+    seo = await get_seo_settings()
+    result = await ssr_render.render(path, host, db, seo, template)
+    if result["status"] in (301, 302, 308):
+        return RedirectResponse(result["location"], status_code=result["status"])
+    return HTMLResponse(content=result["html"], status_code=result["status"],
+                        headers={"Cache-Control": "public, max-age=60", "Content-Type": result["content_type"]})
+
+@api_router.get("/og/page.png")
+async def og_page(title: str = "Intrinsic Technology", label: str = "Intrinsic Technology"):
+    data = await asyncio.to_thread(_render_og, title[:160], label[:70])
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+@api_router.get("/og/default.png")
+async def og_default():
+    data = await asyncio.to_thread(_render_og, "Managed IT, Cybersecurity & Cloud Services", "Intrinsic Technology")
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
 
 # ---- Branded Open Graph / social share image generation ----
 _OG_W, _OG_H = 1200, 630

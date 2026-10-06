@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { Eyebrow, H2, Paras } from "../components/industry/IndustrySections";
 
@@ -215,6 +216,7 @@ export default function CloudHome() {
           testid="cloud-plan"
         />
       </main>
+      <PageFaqs path="/services/cloud" />
       <Footer />
     </div>
   );

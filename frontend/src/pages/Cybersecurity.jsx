@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Radar, Fingerprint, Network, ScanSearch, Activity, ClipboardCheck, Cross, Landmark, HeartHandshake, Building2, Construction } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { ImageMotion } from "../components/cyber/ImageMotion";
 import { Eyebrow, H2 } from "../components/industry/IndustrySections";
@@ -177,6 +178,7 @@ export default function Cybersecurity() {
         <Industry />
         <CTA />
       </main>
+      <PageFaqs path="/services/cybersecurity" />
       <Footer />
     </div>
   );

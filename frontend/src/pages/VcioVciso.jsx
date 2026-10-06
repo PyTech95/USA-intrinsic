@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { Eyebrow, H2, Paras } from "../components/industry/IndustrySections";
 
@@ -137,6 +138,7 @@ export default function VcioVciso() {
         <Vciso />
         <Action />
       </main>
+      <PageFaqs path="/services/vcio-vciso" />
       <Footer />
     </div>
   );

@@ -5,6 +5,7 @@ import AutoReveal from "./components/AutoReveal";
 import HomePage from "./pages/HomePage";
 import ComingSoon from "./pages/ComingSoon";
 import NotFound from "./pages/NotFound";
+import ServiceAreaPage from "./pages/ServiceAreaPage";
 // Admin + editor are code-split out of the public bundle (loaded only when needed).
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
@@ -31,7 +32,6 @@ import HealthcarePage from "./pages/HealthcarePage";
 import Networking from "./pages/Networking";
 import NetworkPerimeterSecurity from "./pages/NetworkPerimeterSecurity";
 import Microsoft365 from "./pages/Microsoft365";
-import ManagedIT from "./pages/ManagedIT";
 import ManagedSupport from "./pages/ManagedSupport";
 import VcioVciso from "./pages/VcioVciso";
 import CaseStudy from "./pages/CaseStudy";
@@ -177,12 +177,10 @@ function App() {
           <Route path="/services/network-perimeter-security" element={<NetworkPerimeterSecurity />} />
           <Route path="/services/microsoft-365" element={<Microsoft365 />} />
           <Route path="/services/managed-it" element={<ManagedSupport />} />
-          <Route path="/services/managed-support" element={<ManagedSupport />} />
           <Route path="/services/vcio-vciso" element={<VcioVciso />} />
           <Route path="/resources/service-briefs" element={<Navigate to="/resources#service-briefs" replace />} />
           <Route path="/case-studies/:slug" element={<CaseStudy />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/services/managed-it-services" element={<ManagedIT />} />
           <Route path="/services/security-governance-compliance" element={<SecurityGovernance />} />
           <Route path="/services/co-managed-it" element={<CoManagedIT />} />
           <Route path="/services/security-monitoring-siem" element={<SecurityMonitoring />} />
@@ -193,7 +191,6 @@ function App() {
           <Route path="/services/cloud" element={<CloudHome />} />
           <Route path="/services/cloud-infrastructure-migration" element={<CloudInfrastructure />} />
           <Route path="/services/ai" element={<AiHome />} />
-          <Route path="/services/ai-automation" element={<AiHome />} />
           <Route path="/services/ai-readiness-assessment" element={<AiReadiness />} />
           <Route path="/services/managed-ai" element={<ManagedAi />} />
           <Route path="/services/ai-governance-compliance" element={<AiGovernance />} />
@@ -206,6 +203,7 @@ function App() {
           <Route path="/industries/non-profit" element={<NonProfitPage />} />
           <Route path="/industries/healthcare" element={<HealthcarePage />} />
           <Route path="/industries/:slug" element={<IndustryPage />} />
+          <Route path="/service-areas/:slug" element={<ServiceAreaPage />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
           {/* Legacy URL redirects (crawler 301s handled by prerendered stubs) */}
@@ -217,6 +215,10 @@ function App() {
           <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
           <Route path="/jobs" element={<Navigate to="/careers" replace />} />
           <Route path="/jobs/:slug" element={<Navigate to="/careers" replace />} />
+          <Route path="/job-openings" element={<Navigate to="/careers" replace />} />
+          <Route path="/services/managed-support" element={<Navigate to="/services/managed-it" replace />} />
+          <Route path="/services/managed-it-services" element={<Navigate to="/services/managed-it" replace />} />
+          <Route path="/services/ai-automation" element={<Navigate to="/services/ai" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>

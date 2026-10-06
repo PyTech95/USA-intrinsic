@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { GoldBtn } from "../components/ai/AiGraphics";
 import { H2 } from "../components/industry/IndustrySections";
@@ -152,6 +153,7 @@ export default function AiHome() {
       <ScrollProgress />
       <Navbar />
       <main><Hero /><Applications /><Approach /><Environment /><Strategy /></main>
+      <PageFaqs path="/services/ai" />
       <Footer />
     </div>
   );

@@ -1,0 +1,28 @@
+# Legacy / alias URL -> current path (301) reference map.
+#
+# NOTE: As of Oct 2026 these redirects are enforced authoritatively in the
+# FastAPI SSR layer (backend/ssr.py REDIRECTS + old-job handling), so nginx does
+# not need this map to function. It is kept as documentation and for Search
+# Console review. Old individual job URLs 301 to /careers/<slug> only when an
+# active role with that slug exists; otherwise they return HTTP 410 (Gone).
+#
+# old path                              -> new path (301)
+/about-us/                              -> /about
+/help-desk-support/                     -> /services/managed-it
+/healthcare/                            -> /industries/healthcare
+/terms-conditions/                      -> /terms-of-service
+/contact-us/                            -> /contact
+/jobs/                                  -> /careers
+/job-openings/                          -> /careers
+/services/managed-support/              -> /services/managed-it
+/services/managed-it-services/          -> /services/managed-it
+/services/ai-automation/                -> /services/ai
+#
+# Old job detail URLs (301 to /careers/<slug> if role active, else 410):
+/jobs/sales-representative/             -> /careers/sales-representative (or 410)
+/jobs/it-support-level-2/               -> /careers/it-support-level-2 (or 410)
+/jobs/it-project-manager/               -> /careers/it-project-manager (or 410)
+/jobs/accounting-specialist/            -> 410 (no active replacement)
+/jobs/accounting-and-administrative-assistant/ -> 410 (no active replacement)
+#
+# Unknown/retired pages not listed here return a genuine HTTP 404.

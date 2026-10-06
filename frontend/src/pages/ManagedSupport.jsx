@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { AiEyebrow, GoldBtn, NavyBtn, ExploreLink, Mosaic, MiniArt, PhotoBand, C } from "../components/ai/AiGraphics";
 
@@ -164,6 +165,7 @@ export default function ManagedSupport() {
       <ScrollProgress />
       <Navbar />
       <main><Hero /><Services /><Operate /><Integrated /><Ongoing /><Model /><CTA /></main>
+      <PageFaqs path="/services/managed-it" />
       <Footer />
     </div>
   );
