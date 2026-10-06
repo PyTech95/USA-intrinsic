@@ -1,0 +1,62 @@
+{
+  "summary": "Verified iteration 2 scope: (1) JobPosting JSON-LD on all 5 job detail pages via live preview, (2) 7 legacy URL redirects via React Router on live preview, (3) build artifact inspection for prerendered case studies, jobs, and redirect stubs, (4) no regression on home/service/careers/case-study pages. All checks PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "redirect stubs (e.g. /about-us build/index.html)", "issues": ["Duplicate <meta name=\"robots\"> tags: default 'index, follow' from base index.html template is NOT removed before stub injects 'noindex, follow'. Crawlers typically take the most restrictive directive, but it is cleaner to strip the default on redirect stubs."]}
+    ]
+  },
+  "verification_details": {
+    "job_pages_live": {
+      "cloud-solutions-engineer": {"title": "Cloud Solutions Engineer | Intrinsic Technology", "JobPosting": true, "employmentType": "FULL_TIME", "datePosted": true, "hiringOrganization": "Intrinsic Technology"},
+      "security-operations-analyst": "OK",
+      "it-support-level-2": "OK (title uses em-dash: 'IT Support — Level 2 | Intrinsic Technology')",
+      "it-project-manager": "OK",
+      "sales-representative": "OK"
+    },
+    "redirects_live": {
+      "/about-us->/about": "OK",
+      "/help-desk-support->/services/managed-it": "OK",
+      "/healthcare->/industries/healthcare": "OK",
+      "/terms-conditions->/terms-of-service": "OK",
+      "/privacy->/privacy-policy": "OK",
+      "/contact-us->/contact": "OK",
+      "/jobs->/careers": "OK"
+    },
+    "prerender_build": {
+      "script_output": "static=34 redirects=7 dynamic=10 (total=44)",
+      "case_studies_prerendered": 5,
+      "all_case_studies": "each has <title> '<Name> | Intrinsic Technology', self-canonical, JSON-LD Article + BreadcrumbList",
+      "jobs_prerendered": 5,
+      "all_jobs": "each has JSON-LD JobPosting with employmentType=FULL_TIME, datePosted, hiringOrganization=Intrinsic Technology, exactly 1 <h1>",
+      "blogs_prerendered": 0,
+      "blogs_note": "Expected 0 (all 3 blogs are drafts/unpublished per request)",
+      "redirect_stubs": "7/7 present (about-us, help-desk-support, healthcare, terms-conditions, privacy, contact-us, jobs). Each contains canonical to intrinsicamerica.com target, <meta http-equiv='refresh' url=/target>, <meta name='robots' noindex, follow>, and window.location.replace('/target')"
+    },
+    "no_regression": {
+      "/": "'Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services'",
+      "/services/cybersecurity": "'Cybersecurity Services | Intrinsic Technology'",
+      "/careers": "'Careers at Intrinsic Technology | Intrinsic Technology'",
+      "/case-studies/strengthening-endpoint-security-and-patch-compliance": "'Strengthening Endpoint Security and Patch Compliance | Intrinsic Technology'"
+    }
+  },
+  "test_report_links": ["/app/backend/tests/test_seo_endpoints.py"],
+  "action_items": [
+    "(Minor/optional) In prerender.cjs redirect stub, strip the default <meta name=\"robots\" content=\"index, follow\"> from the base template before injecting the noindex override, to avoid duplicate robots meta tags.",
+    "(Minor) The /careers title 'Careers at Intrinsic Technology | Intrinsic Technology' duplicates the brand — could be shortened to 'Careers at Intrinsic Technology'. Not a regression."
+  ],
+  "critical_code_review_comments": [
+    "JobPosting JSON-LD correctly built client-side via usePageSeo + jobPostingLd() and matches server-prerendered copy — good consistency.",
+    "Redirect pattern uses both <Navigate> (React Router) for SPA + prerendered stub with meta refresh + JS replace for non-JS crawlers — correct dual-path implementation.",
+    "Minor cleanliness: default 'index, follow' robots meta remains alongside 'noindex, follow' on redirect stubs."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not retested per request)", "frontend": "100%"},
+  "test_credentials": "not needed for this iteration (public pages only)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 2 scope fully verified. Prerender output lives in /app/frontend/build and must be regenerated after any route change (run `node scripts/prerender.cjs` from /app/frontend). Dev server (craco) serves same index.html for all SPA routes — that is expected; prerender is a build-time artifact only. Blogs prerender count = 0 because all blogs are drafts; not a bug. If blogs are published later, dynamicRoutes() in scripts/prerender.cjs will pick them up via GET /api/content/blogs."
+}

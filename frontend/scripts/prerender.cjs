@@ -160,6 +160,7 @@ function renderRedirect(template, from, to) {
   const target = BASE + to;
   let html = template;
   html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>Redirecting… | Intrinsic Technology</title>`);
+  html = html.replace(/\s*<meta name="robots"[^>]*>/g, "");
   const head = `<link rel="canonical" href="${esc(target)}" data-prerender="1" />\n<meta http-equiv="refresh" content="0; url=${esc(to)}" />\n<meta name="robots" content="noindex, follow" />\n<script>window.location.replace(${JSON.stringify(to)});</script>\n</head>`;
   html = html.replace("</head>", head);
   html = html.replace(/<div id="root">\s*<\/div>/, `<div id="root"><main><p>This page has moved. Redirecting to <a href="${esc(to)}">${esc(target)}</a>.</p></main></div>`);
