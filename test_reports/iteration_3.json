@@ -1,0 +1,66 @@
+{
+  "summary": "Iteration 3 (SSR + SEO/GEO): full backend verification of GET /api/ssr for 10 representative paths plus legacy/alias/error paths, crawler files, OG images, and sitemap. All 28 pytest cases passed (test_ssr_i30.py). Frontend live-preview checks: new /service-areas/new-york and /service-areas/new-jersey render with data-testid='service-area-page', correct <title> and route-specific H1 (not Contact page). Core service pages (cybersecurity, managed-it, cloud, ai, vcio-vciso) render data-testid='page-faqs'. Client-side alias redirects work (/services/managed-support -> /services/managed-it, /about-us -> /about). Home, contact, and existing service pages render with original design, no console/pageerror. Admin login works and dashboard loads. Audit script scripts/audit_seo.py reports 46 pages, 0 issues.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verification_details": {
+    "ssr_paths_tested_200": [
+      "/", "/about", "/services/managed-it", "/services/cybersecurity",
+      "/industries/healthcare", "/service-areas/new-york", "/service-areas/new-jersey",
+      "/careers", "/case-studies/strengthening-endpoint-security-and-patch-compliance",
+      "/careers/cloud-solutions-engineer"
+    ],
+    "ssr_per_page_asserts": "unique <title>, meta description, exactly 1 canonical to https://intrinsicamerica.com<path>, og:title/og:description/og:image, twitter tag, exactly 1 <h1>, body text >300 chars, valid JSON-LD",
+    "schema_requirements_verified": {
+      "services": "Service + BreadcrumbList",
+      "core_services_and_locations_and_home": "FAQPage present",
+      "case_studies": "Article",
+      "jobs": "JobPosting with employmentType + datePosted + hiringOrganization"
+    },
+    "redirects_301_verified": [
+      "/about-us -> /about",
+      "/help-desk-support -> /services/managed-it",
+      "/healthcare -> /industries/healthcare",
+      "/terms-conditions -> /terms-of-service",
+      "/contact-us -> /contact",
+      "/jobs -> /careers",
+      "/services/managed-support -> /services/managed-it",
+      "/services/ai-automation -> /services/ai",
+      "/jobs/it-support-level-2 -> /careers/it-support-level-2"
+    ],
+    "jobs_accounting_specialist_410": "OK",
+    "nonexistent_path_404": "OK (/nope-xyz-404)",
+    "www_to_non_www_301": "OK (X-Forwarded-Host: www.intrinsicamerica.com -> https://intrinsicamerica.com/<path>)",
+    "robots_txt": "allows GPTBot/OAI-SearchBot/ChatGPT-User/ClaudeBot/PerplexityBot/Bingbot/Google-Extended + Sitemap line",
+    "llms_txt": "200 text, >200 chars, mentions Intrinsic",
+    "sitemap_xml": "valid XML; includes /service-areas/new-york and /service-areas/new-jersey; excludes redirect/admin paths",
+    "og_images": {"/api/og/default.png": "200 image/png", "/api/og/page.png?title=Test&label=Service": "200 image/png"},
+    "frontend_live": {
+      "service-areas/new-york": "title 'Managed IT Services in New York City | Intrinsic Technology', H1 'Managed IT Services in New York City', data-testid='service-area-page' present",
+      "service-areas/new-jersey": "title & H1 route-specific for NJ, data-testid='service-area-page' present",
+      "service_pages_faqs": "data-testid='page-faqs' present on managed-it, cybersecurity, cloud, ai, vcio-vciso",
+      "client_redirects": "/services/managed-support -> /services/managed-it, /about-us -> /about",
+      "home_contact": "render original design, contact form present (1), 0 console errors",
+      "admin_login": "admin@intrinsictg.com login succeeds; admin dashboard (Overview, Inquiries, Blogs, Service briefs, SEO & GEO, etc.) loads"
+    },
+    "audit_script": "scripts/audit_seo.py: 46 pages, 0 issues"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ssr_i30.py",
+    "/app/test_reports/pytest/ssr_i30.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SSR is clean: single canonical, unique titles, well-formed JSON-LD (zero parse errors across all 46 audited pages).",
+    "Redirect handling via /api/ssr correctly distinguishes 301 (legacy/alias/www), 404 (unknown), and 410 (gone jobs like /jobs/accounting-specialist).",
+    "Service-area pages correctly scoped to new-york/new-jersey; both include FAQPage schema plus Service + BreadcrumbList.",
+    "/careers/it-project-manager and /careers/sales-representative were audited beyond the required /careers/cloud-solutions-engineer and also produce JobPosting with employmentType/datePosted/hiringOrganization.",
+    "In the Emergent preview the dev server still serves the SPA shell for direct URL hits (expected); SSR correctness must be validated via /api/ssr (done). On the VPS nginx proxies HTML requests to /api/ssr."
+  ],
+  "updated_files": ["/app/backend/tests/test_ssr_i30.py"],
+  "success_rate": {"backend": "100% (28/28 pytest)", "frontend": "100% (all live-preview checks passed, 0 console errors)"},
+  "test_credentials": "admin@intrinsictg.com / 080b308a140ae894077cebae (works at /admin/login)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "SSR is now the production SEO/GEO mechanism: GET /api/ssr?path=<p> (reads X-Original-URI header first, falls back to ?path= query). Tests at /app/backend/tests/test_ssr_i30.py cover 10 representative paths + redirects/errors/crawler files/OG images. The in-preview dev server still serves the SPA shell for direct URL hits (expected). Audit: AUDIT_API=http://localhost:8001/api python3 scripts/audit_seo.py -> 46 pages, 0 issues."
+}
