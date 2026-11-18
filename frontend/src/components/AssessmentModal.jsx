@@ -36,6 +36,7 @@ const AssessmentModal = ({ open, onClose }) => {
         message: form.message, type: "assessment",
         details: { company_size: form.company_size, primary_concern: form.concern, current_provider: form.current_provider },
       });
+      window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "generate_lead", form_id: "risk_assessment" });
       setDone(true);
     } catch (err) { setError(errMsg(err)); }
     finally { setLoading(false); }

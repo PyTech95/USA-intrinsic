@@ -34,6 +34,7 @@ const ContactModal = ({ open, onClose }) => {
     setLoading(true);
     try {
       await api.post("/inquiries", form);
+      window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "generate_lead", form_id: "contact" });
       setDone(true);
     } catch (err) { setError(errMsg(err)); }
     finally { setLoading(false); }
