@@ -180,8 +180,17 @@ def test_redirect(src, code, dst):
     assert loc.rstrip("/") == expected.rstrip("/"), f"{src} -> {loc} (expected {expected})"
 
 
-def test_jobs_accounting_gone_410():
+def test_old_job_without_an_open_role_goes_to_careers():
+    # was 410 (gone); Search Console kept listing these under "Not found (404)", so they now
+    # go to the Careers page
     r = ssr("/jobs/accounting-specialist", follow=False)
+    assert r.status_code == 301, f"expected 301, got {r.status_code}"
+    loc = r.headers.get("location") or r.headers.get("Location")
+    assert loc == "https://intrinsicamerica.com/careers", loc
+
+
+def test_old_job_feed_gone_410():
+    r = ssr("/jobs/feed", follow=False)
     assert r.status_code == 410, f"expected 410, got {r.status_code}"
 
 

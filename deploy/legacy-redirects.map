@@ -18,11 +18,40 @@
 /services/managed-it-services/          -> /services/managed-it
 /services/ai-automation/                -> /services/ai
 #
-# Old job detail URLs (301 to /careers/<slug> if role active, else 410):
-/jobs/sales-representative/             -> /careers/sales-representative (or 410)
-/jobs/it-support-level-2/               -> /careers/it-support-level-2 (or 410)
-/jobs/it-project-manager/               -> /careers/it-project-manager (or 410)
-/jobs/accounting-specialist/            -> 410 (no active replacement)
-/jobs/accounting-and-administrative-assistant/ -> 410 (no active replacement)
+# Old job detail URLs (301 to /careers/<slug> if the role is open, else 301 to /careers):
+/jobs/sales-representative/             -> /careers/sales-representative (or /careers)
+/jobs/it-support-level-2/               -> /careers/it-support-level-2 (or /careers)
+/jobs/it-project-manager/               -> /careers/it-project-manager (or /careers)
+/jobs/accounting-specialist/            -> /careers
+/jobs/accounting-and-administrative-assistant/ -> /careers
+/jobs/feed/                             -> 410 (the old job feed is gone, not moved)
+#
+# Added 19 Nov 2026 from Search Console (Pages > Not found (404), and old addresses still indexed
+# or crawled). Old addresses are matched in lower case, so /Home works too.
+/privacy/                               -> /privacy-policy
+/Home                                   -> /
+/non-profit-organizations/              -> /industries/non-profit
+/legal-professional-services/           -> /industries/professional-services
+/banking-finance/                       -> /industries/financial-services
+/cyber-security/                        -> /services/cybersecurity
+/cloud-services/                        -> /services/cloud
+/application-cloud-support/             -> /services/cloud
+/infrastructure-management/             -> /services/remote-monitoring-management
+/strategic-projects/                    -> /services/vcio-vciso
+/cost-calculator/                       -> /contact
+/cookie-policy/                         -> /privacy-policy
+/job-location/<anything>/               -> /careers
+/job-category/<anything>/               -> /careers
+/job-type/<anything>/                   -> /careers
+/services                               -> /            (no services index page; in the breadcrumb trail)
+/case-studies                           -> /resources   (no case-study index page; in the breadcrumb trail)
+/service-areas                          -> /service-areas/new-york
+#
+# Any other address ending in "/" (for example /careers/) 301s to the same address without it.
+#
+# Served by nginx, not redirected: /briefs/*.pdf (the "pdf" extension must be in the static-file
+# location in nginx-intrinsic.conf; without it these downloads return 404).
+#
+# Not real pages, left as 404: /wp-admin/admin-ajax.php, /wp-admin/*, /*
 #
 # Unknown/retired pages not listed here return a genuine HTTP 404.
