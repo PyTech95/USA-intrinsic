@@ -49,6 +49,7 @@ const AssessmentForm = () => {
         message: form.message, type: "assessment",
         details: { company_size: form.company_size, primary_concern: form.concern, source: "assessment-landing-page" },
       });
+      window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "generate_lead", form_id: "risk_assessment" });
       setDone(true);
     } catch (err) { setError(errMsg(err)); }
     finally { setLoading(false); }

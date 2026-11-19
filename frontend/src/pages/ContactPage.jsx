@@ -90,6 +90,7 @@ const ContactForm = ({ briefId }) => {
         setDownload({ url: imgUrl(data.file), title: data.title });
       } else {
         await api.post("/inquiries", { ...payload, type: "contact" });
+        window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "generate_lead", form_id: "contact" });
       }
       setDone(true);
     } catch (err) { setError(errMsg(err)); } finally { setLoading(false); }
