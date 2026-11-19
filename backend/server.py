@@ -19,6 +19,7 @@ import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Header, Response, BackgroundTasks, Request
 from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
 import ssr_render
+from ssr import is_api_data
 from starlette.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -787,10 +788,12 @@ async def _with_boot_data(html: str, path: str) -> str:
             "customCss": (await get_custom_css()).model_dump(mode="json").get("css", ""),
         }
         data = json.dumps(boot, ensure_ascii=False, separators=(",", ":"), default=str)
-        # must not be able to close the <script> element or break JavaScript string parsing
+        # must not be able to close the <script> element
         for raw, safe in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026"), ("\u2028", "\\u2028"), ("\u2029", "\\u2029")):
             data = data.replace(raw, safe)
-        return html.replace("</head>", f"<script>window.__INTR_BOOT__={data};</script>\n</head>", 1)
+        # A JSON data block, not inline JavaScript: the live server's Content-Security-Policy
+        # (script-src 'self') would refuse an inline script.
+        return html.replace("</head>", f'<script type="application/json" id="intr-boot">{data}</script>\n</head>', 1)
     except Exception as e:      # never fail a page over this; the app falls back to its API calls
         logger.error(f"Boot data skipped for {path}: {e}")
         return html
@@ -1192,6 +1195,18 @@ async def modes_stats(admin: dict = Depends(get_current_admin)):
 app.include_router(api_router)
 app.include_router(create_analytics_router(db, get_current_admin))
 app.include_router(create_migration_router(db, get_current_admin, put_object, get_object))
+
+@app.middleware("http")
+async def _noindex_api_data(request: Request, call_next):
+    """Search Console listed 46 of these data addresses (/api/live-edits?path=..., /api/live-blocks?path=...,
+    /api/seo, /api/theme ...) as "Crawled - currently not indexed". They are data the pages load, not
+    pages, so tell search engines not to index them. Only JSON answers get the header: the pages
+    themselves (served as HTML through /api/ssr), the sitemap, robots.txt, llms.txt and images never do."""
+    response = await call_next(request)
+    if is_api_data(request.url.path, response.headers.get("content-type", "")):
+        response.headers.setdefault("X-Robots-Tag", "noindex")
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,

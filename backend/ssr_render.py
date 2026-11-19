@@ -1,7 +1,7 @@
 """Request-time render orchestrator for public pages (used by /api/ssr)."""
 from __future__ import annotations
 import re
-from ssr import (ROUTES, INTRO, FAQS, REDIRECTS, OLD_JOB_PATHS, ORG, PREFERRED_BASE,
+from ssr import (ROUTES, INTRO, FAQS, REDIRECTS, REDIRECT_PREFIXES, OLD_JOB_PATHS, ORG, PREFERRED_BASE,
                  esc, titlecase, normalize, breadcrumb_ld, faq_ld, _ld,
                  _nav_and_contact, _faq_html, _crumbs_html)
 import md_html
@@ -66,17 +66,29 @@ async def render(path: str, host: str, db, seo: dict, template: str) -> dict:
     if host and host.lower().startswith("www."):
         return {"status": 301, "location": base + (path if path.startswith("/") else "/" + path)}
 
-    # 2) legacy redirects
-    if p in REDIRECTS:
-        return {"status": 301, "location": base + REDIRECTS[p]}
+    # 2) legacy redirects. Old addresses were not case-sensitive (/Home), so match in lower case.
+    legacy = p.lower()
+    if legacy in REDIRECTS:
+        return {"status": 301, "location": base + REDIRECTS[legacy]}
+    for prefix, target in REDIRECT_PREFIXES.items():
+        if legacy.startswith(prefix):
+            return {"status": 301, "location": base + target}
 
-    # 3) old individual job URLs -> careers if a matching active job exists, else 410
+    # 3) old individual job URLs -> the same role under Careers if it is open, else Careers.
+    #    The old job feed is the one exception: it is gone, not moved.
     if p.startswith("/jobs/"):
         slug = p.split("/jobs/", 1)[1]
+        if slug == "feed":
+            return {"status": 410, "html": _error_html(template, 410, base), "content_type": "text/html; charset=utf-8"}
         job = await db.jobs.find_one({"slug": slug, "published": {"$ne": False}})
-        if job:
-            return {"status": 301, "location": base + f"/careers/{slug}"}
-        return {"status": 410, "html": _error_html(template, 410, base), "content_type": "text/html; charset=utf-8"}
+        return {"status": 301, "location": base + (f"/careers/{slug}" if job else "/careers")}
+
+    # 3b) one address per page: /careers/ is the same page as /careers, so send the
+    #     trailing-slash form to the plain one (Search Console listed /careers/ as a duplicate).
+    raw = (path or "/").split("#")[0]
+    raw_path, _, query = raw.partition("?")
+    if len(raw_path) > 1 and raw_path.endswith("/"):
+        return {"status": 301, "location": base + p + (f"?{query}" if query else "")}
 
     og_title = ((seo.get("pages") or {}).get(p) or {}).get("title") or ROUTES.get(p, {}).get("title", ORG["name"])
     og_default = f"{base}/api/og/page.png?title={_q(og_title)}&label=Intrinsic%20Technology"

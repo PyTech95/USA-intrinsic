@@ -157,16 +157,47 @@ REDIRECTS = {
     "/services/managed-support": "/services/managed-it",
     "/services/managed-it-services": "/services/managed-it",
     "/services/ai-automation": "/services/ai",
+    # Old-site addresses that Search Console reported as "Not found (404)" or still held in its
+    # index on 19 Nov 2026. Each goes to the closest current page.
+    "/home": "/",
+    "/non-profit-organizations": "/industries/non-profit",
+    "/legal-professional-services": "/industries/professional-services",
+    "/banking-finance": "/industries/financial-services",
+    "/cyber-security": "/services/cybersecurity",
+    "/cloud-services": "/services/cloud",
+    "/application-cloud-support": "/services/cloud",
+    "/infrastructure-management": "/services/remote-monitoring-management",
+    "/strategic-projects": "/services/vcio-vciso",
+    "/cost-calculator": "/contact",
+    "/cookie-policy": "/privacy-policy",
+    # Section addresses that have no page of their own. Google finds them through the breadcrumb
+    # trail (Home > Services > Managed IT). The homepage carries the full list of services.
+    "/services": "/",
+    "/case-studies": "/resources",
+    "/service-areas": "/service-areas/new-york",
     # Articles are listed on the Resources and Insights page (there is no separate blog index)
     "/blog": "/resources",
 }
-# Old individual job URLs: redirect to Careers only where a relevant role exists,
-# otherwise return 410 (gone). Checked against live jobs at request time.
+# Old job-board listing addresses (/job-location/new-york, /job-category/sales, /job-type/full-time):
+# anything under these goes to Careers.
+REDIRECT_PREFIXES = {
+    "/job-location/": "/careers",
+    "/job-category/": "/careers",
+    "/job-type/": "/careers",
+}
+# Old individual job URLs: redirect to the matching role where one is open, otherwise to
+# Careers. Checked against live jobs at request time.
 OLD_JOB_PATHS = [
     "/jobs/sales-representative", "/jobs/accounting-specialist",
     "/jobs/accounting-and-administrative-assistant", "/jobs/it-support-level-2",
     "/jobs/it-project-manager",
 ]
+
+def is_api_data(path: str, content_type: str) -> bool:
+    """True for the JSON data the pages load from /api/ (never for a page, the sitemap, robots.txt,
+    llms.txt or an image). Used to send "X-Robots-Tag: noindex" with it."""
+    return (path or "").startswith("/api/") and (content_type or "").lower().startswith("application/json")
+
 
 def normalize(path: str) -> str:
     path = (path or "/").split("?")[0].split("#")[0]

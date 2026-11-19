@@ -12,7 +12,6 @@ const ServiceAreaPage = lazy(() => import("./pages/ServiceAreaPage"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 import { VisitorTracker } from "./components/VisitorTracker";
-import { GtmPageViews } from "./components/GtmPageViews";
 import TextReveal from "./components/TextReveal";
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const AiHome = lazy(() => import("./pages/AiHome"));
@@ -169,7 +168,6 @@ function App() {
         <TextReveal />
         <ViewportScale />
         <VisitorTracker />
-        <GtmPageViews />
         <CtaInterceptor onContact={() => setContactOpen(true)} onSample={() => setSampleOpen(true)} />
         <LiveEditProvider>
         <Suspense fallback={<PageLoading />}>

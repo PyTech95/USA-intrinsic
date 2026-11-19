@@ -29,9 +29,14 @@ export const holdFirstPaint = () => {
 // Data the server embedded in the page (see _with_boot_data in backend/server.py): this page's
 // saved edits, the theme and the custom CSS. With it the first page of a visit needs no API
 // round-trips before it can be shown. Absent (e.g. in local dev) the app fetches them as before.
+// It arrives as a JSON data block (<script type="application/json" id="intr-boot">), not as
+// inline JavaScript, so it also works under a Content-Security-Policy that forbids inline scripts.
 const BOOT = (() => {
-  const b = typeof window !== "undefined" ? window.__INTR_BOOT__ : null;
-  return b && typeof b.path === "string" && Array.isArray(b.liveEdits) ? b : null;
+  try {
+    const el = typeof document !== "undefined" ? document.getElementById("intr-boot") : null;
+    const b = el ? JSON.parse(el.textContent) : null;
+    return b && typeof b.path === "string" && Array.isArray(b.liveEdits) ? b : null;
+  } catch { return null; }
 })();
 // Signed-in admins (and edit / review links) always load fresh data: the HTML can be up to a
 // minute old in caches, and an editor must see what was just saved.
