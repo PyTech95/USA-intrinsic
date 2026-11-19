@@ -71,11 +71,14 @@ export function SeoController() {
 
     let title, description, keywords, image, robots, type = "website", extraLd = [];
     if (detail) {
-      title = detail.title ? tmpl.replace("{title}", detail.title) : settings.default_title;
-      description = detail.description || settings.default_description;
-      keywords = detail.keywords || settings.default_keywords;
-      image = detail.image || settings.default_og_image;
-      robots = detail.robots || settings.robots_default;
+      // A page that supplies its own SEO (service areas, articles, case studies) still yields to
+      // what the admin entered for that exact address under SEO & GEO > Per-page overrides.
+      const detailTitle = override.title || detail.title;
+      title = detailTitle ? tmpl.replace("{title}", detailTitle) : settings.default_title;
+      description = override.description || detail.description || settings.default_description;
+      keywords = override.keywords || detail.keywords || settings.default_keywords;
+      image = override.og_image || detail.image || settings.default_og_image;
+      robots = override.robots || detail.robots || settings.robots_default;
       type = detail.type || "article";
       extraLd = detail.jsonLd || [];
     } else if (pathname === "/") {

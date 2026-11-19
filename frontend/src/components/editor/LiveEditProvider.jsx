@@ -18,6 +18,31 @@ const firstPaintStep = () => {
   document.documentElement.classList.remove("le-wait");
   try { localStorage.setItem("intr_live_edits_ready", "1"); } catch { /* storage full */ }
 };
+// Something else the first paint must wait for (e.g. the first page's code bundle).
+// Returns the function to call when it is ready; calling it more than once has no effect.
+export const holdFirstPaint = () => {
+  if (firstPaintPending <= 0) return () => {};       // first paint already happened
+  firstPaintPending++;
+  let released = false;
+  return () => { if (!released) { released = true; firstPaintStep(); } };
+};
+// Data the server embedded in the page (see _with_boot_data in backend/server.py): this page's
+// saved edits, the theme and the custom CSS. With it the first page of a visit needs no API
+// round-trips before it can be shown. Absent (e.g. in local dev) the app fetches them as before.
+const BOOT = (() => {
+  const b = typeof window !== "undefined" ? window.__INTR_BOOT__ : null;
+  return b && typeof b.path === "string" && Array.isArray(b.liveEdits) ? b : null;
+})();
+// Signed-in admins (and edit / review links) always load fresh data: the HTML can be up to a
+// minute old in caches, and an editor must see what was just saved.
+const bootFor = (pathname) => {
+  if (!BOOT || BOOT.path !== pathname) return null;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (getToken() || q.has("edit") || q.has("review")) return null;
+  } catch { return null; }
+  return BOOT;
+};
 const readJson = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } };
 const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full */ } };
 export const useLiveEdit = () => useContext(LiveEditContext);
@@ -34,25 +59,28 @@ const styleTag = (id) => {
 
 export default function LiveEditProvider({ children }) {
   const { pathname } = useLocation();
-  const [edits, setEdits] = useState([]);
-  const [theme, setTheme] = useState(() => readJson("intr_theme_cache", {}));
+  const boot = useRef(bootFor(pathname));      // set only when the server embedded data for the page we start on
+  const [edits, setEdits] = useState(() => (boot.current ? boot.current.liveEdits : []));
+  const [theme, setTheme] = useState(() => (boot.current && boot.current.theme) || readJson("intr_theme_cache", {}));
   const [themePreview, setThemePreview] = useState(null);
-  const [customCss, setCustomCss] = useState(() => readJson("intr_custom_css_cache", ""));
+  const [customCss, setCustomCss] = useState(() => (boot.current && typeof boot.current.customCss === "string" ? boot.current.customCss : readJson("intr_custom_css_cache", "")));
   const [customCssPreview, setCustomCssPreview] = useState(null);
   const [framePreview, setFramePreview] = useState(null);
-  const [themeReady, setThemeReady] = useState(false);
+  const [themeReady, setThemeReady] = useState(() => !!(boot.current && boot.current.theme));
   const [themeError, setThemeError] = useState("");
-  const [editsPath, setEditsPath] = useState(null);
+  const [editsPath, setEditsPath] = useState(() => (boot.current ? pathname : null));
   const [editsError, setEditsError] = useState("");
   const [editsLoadAttempt, setEditsLoadAttempt] = useState(0);
-  const [savedEdits, setSavedEdits] = useState([]);
+  const [savedEdits, setSavedEdits] = useState(() => (boot.current ? boot.current.liveEdits : []));
   const editsRef = useRef([]);
   const timers = useRef({});
   editsRef.current = edits;
   const [cacheTick, setCacheTick] = useState(0);
 
   useEffect(() => {
-    api.get("/live-edits").then(({ data }) => {
+    // Every page's edits, cached so later page changes apply them instantly. Not needed for the
+    // page being loaded, so it waits until the browser is idle instead of competing with it.
+    const load = () => api.get("/live-edits").then(({ data }) => {
       const grouped = {};
       (data || []).forEach((e) => { (grouped[e.path] ||= []).push(e); });
       Object.keys(editsCache).forEach((k) => delete editsCache[k]);
@@ -60,6 +88,10 @@ export default function LiveEditProvider({ children }) {
       persistCache();
       setCacheTick((t) => t + 1);
     }).catch(() => {});
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(load, { timeout: 4000 })
+      : setTimeout(load, 2500);
+    return () => (window.cancelIdleCallback ? window.cancelIdleCallback(idle) : clearTimeout(idle));
   }, []);
 
   useEffect(() => {
@@ -78,7 +110,15 @@ export default function LiveEditProvider({ children }) {
 
   useLayoutEffect(() => { document.documentElement.dataset.lePage = pathname; }, [pathname]);
 
+  const bootEditsUsed = useRef(false);
   useEffect(() => {
+    // First page of the visit: its edits came embedded in the HTML and are already in state.
+    if (!bootEditsUsed.current && boot.current && boot.current.path === pathname && editsLoadAttempt === 0) {
+      bootEditsUsed.current = true;
+      cachePage(pathname, boot.current.liveEdits);
+      return undefined;
+    }
+    bootEditsUsed.current = true;
     let alive = true;
     setEditsPath(null);
     setEditsError("");
@@ -130,12 +170,26 @@ export default function LiveEditProvider({ children }) {
     } catch (error) { setThemeError(errMsg(error)); }
     finally { firstPaintStep(); }
   }, []);
-  useEffect(() => { reloadTheme(); }, [reloadTheme]);
+  useEffect(() => {
+    if (boot.current && boot.current.theme) {       // theme came embedded in the HTML: nothing to wait for
+      writeJson("intr_theme_cache", boot.current.theme);
+      firstPaintStep();
+      return;
+    }
+    reloadTheme();
+  }, [reloadTheme]);
 
   useLayoutEffect(() => { styleTag("le-overrides").textContent = buildCss(pathname, renderedEdits); }, [renderedEdits, pathname]);
   useLayoutEffect(() => { styleTag("le-theme").textContent = themeCss(themePreview || theme); }, [theme, themePreview]);
 
+  const bootCssUsed = useRef(false);
   useEffect(() => {
+    if (!bootCssUsed.current && boot.current && typeof boot.current.customCss === "string") {
+      bootCssUsed.current = true;                    // first page: custom CSS came embedded in the HTML
+      writeJson("intr_custom_css_cache", boot.current.customCss);
+      return undefined;
+    }
+    bootCssUsed.current = true;
     let active = true;
     api.get('/custom-css').then(({ data }) => { if (active) { setCustomCss(data.css); writeJson("intr_custom_css_cache", data.css); } }).catch(() => {});
     return () => { active = false; };

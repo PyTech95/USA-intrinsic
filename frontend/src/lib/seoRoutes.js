@@ -34,6 +34,9 @@ export const SEO_ROUTES = [
   { path: "/industries/financial-services", label: "Financial Services", title: "IT for Financial Services", description: "Compliance-ready managed IT and security for financial services." },
   { path: "/industries/non-profit", label: "Non-Profit", title: "IT for Non-Profits", description: "Affordable, dependable technology for nonprofit organizations." },
   { path: "/industries/healthcare", label: "Healthcare", title: "IT for Healthcare", description: "HIPAA-aligned managed IT and security for healthcare providers." },
+  // Service-area pages (defaults mirror pages/ServiceAreaPage.jsx and backend/ssr.py) — listed here so they can be edited in the admin.
+  { path: "/service-areas/new-york", label: "New York IT Services", title: "Managed IT Services in New York City", description: "On-site and remote managed IT, cybersecurity, and cloud services for New York City businesses, from our 14 Wall Street headquarters." },
+  { path: "/service-areas/new-jersey", label: "New Jersey IT Services", title: "Managed IT Services in New Jersey", description: "Managed IT, cybersecurity, and cloud services for New Jersey businesses, supported from our Paterson, NJ office." },
 ];
 
 export const SEO_ROUTE_MAP = SEO_ROUTES.reduce((m, r) => { m[r.path] = r; return m; }, {});

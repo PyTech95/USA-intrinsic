@@ -150,6 +150,7 @@ REDIRECTS = {
     "/healthcare": "/industries/healthcare",
     "/terms-conditions": "/terms-of-service",
     "/contact-us": "/contact",
+    "/privacy": "/privacy-policy",          # the browser app already redirected this; crawlers got a 404
     "/jobs": "/careers",
     "/job-openings": "/careers",
     # Alias consolidation (choose canonical destinations)

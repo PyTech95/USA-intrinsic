@@ -22,6 +22,7 @@ import ssr_render
 from starlette.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 import io
+import json
 import re as _re
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr
@@ -713,8 +714,33 @@ async def ssr_page(request: Request):
     result = await ssr_render.render(path, host, db, seo, template)
     if result["status"] in (301, 302, 308):
         return RedirectResponse(result["location"], status_code=result["status"])
-    return HTMLResponse(content=result["html"], status_code=result["status"],
+    html = result["html"]
+    if result["status"] == 200:
+        html = await _with_boot_data(html, path)
+    return HTMLResponse(content=html, status_code=result["status"],
                         headers={"Cache-Control": "public, max-age=60", "Content-Type": result["content_type"]})
+
+
+async def _with_boot_data(html: str, path: str) -> str:
+    """Speed: embed what the browser app needs before it may show the page (this page's saved
+    live edits, the theme and the custom CSS) in the HTML itself. Without it the app has to make
+    those API calls after its JavaScript loads, and the page stays hidden until they answer."""
+    try:
+        p = ssr_render.normalize(path)
+        boot = {
+            "path": p,
+            "liveEdits": await db.live_edits.find({"path": p}, {"_id": 0}).to_list(5000),
+            "theme": (await get_theme()).model_dump(mode="json"),
+            "customCss": (await get_custom_css()).model_dump(mode="json").get("css", ""),
+        }
+        data = json.dumps(boot, ensure_ascii=False, separators=(",", ":"), default=str)
+        # must not be able to close the <script> element or break JavaScript string parsing
+        for raw, safe in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026"), ("\u2028", "\\u2028"), ("\u2029", "\\u2029")):
+            data = data.replace(raw, safe)
+        return html.replace("</head>", f"<script>window.__INTR_BOOT__={data};</script>\n</head>", 1)
+    except Exception as e:      # never fail a page over this; the app falls back to its API calls
+        logger.error(f"Boot data skipped for {path}: {e}")
+        return html
 
 @api_router.get("/og/page.png")
 async def og_page(title: str = "Intrinsic Technology", label: str = "Intrinsic Technology"):

@@ -3,54 +3,57 @@ import { useState, useEffect, useLayoutEffect, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, useNavigationType, Navigate } from "react-router-dom";
 import AutoReveal from "./components/AutoReveal";
 import HomePage from "./pages/HomePage";
-import ComingSoon from "./pages/ComingSoon";
-import NotFound from "./pages/NotFound";
-import ServiceAreaPage from "./pages/ServiceAreaPage";
-// Admin + editor are code-split out of the public bundle (loaded only when needed).
+const ComingSoon = lazy(() => import("./pages/ComingSoon"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const ServiceAreaPage = lazy(() => import("./pages/ServiceAreaPage"));
+// Code splitting: the homepage ships in the main bundle; every other page is loaded on demand,
+// so a visitor downloads the code for the page they open rather than for the whole site.
+// Admin + editor are split out the same way.
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 import { VisitorTracker } from "./components/VisitorTracker";
+import { GtmPageViews } from "./components/GtmPageViews";
 import TextReveal from "./components/TextReveal";
-import AboutUs from "./pages/AboutUs";
-import AiHome from "./pages/AiHome";
-import AiReadiness from "./pages/AiReadiness";
-import ManagedAi from "./pages/ManagedAi";
-import AiGovernance from "./pages/AiGovernance";
-import Careers from "./pages/Careers";
-import JobDetail from "./pages/JobDetail";
-import Resources from "./pages/Resources";
-import ContactPage from "./pages/ContactPage";
-import LegalPage from "./pages/LegalPage";
-import Cybersecurity from "./pages/Cybersecurity";
-import Verticals from "./pages/Verticals";
-import IndustryPage from "./pages/IndustryPage";
-import ConstructionPage from "./pages/ConstructionPage";
-import ProfessionalServicesPage from "./pages/ProfessionalServicesPage";
-import FinancialServicesPage from "./pages/FinancialServicesPage";
-import NonProfitPage from "./pages/NonProfitPage";
-import HealthcarePage from "./pages/HealthcarePage";
-import Networking from "./pages/Networking";
-import NetworkPerimeterSecurity from "./pages/NetworkPerimeterSecurity";
-import Microsoft365 from "./pages/Microsoft365";
-import ManagedSupport from "./pages/ManagedSupport";
-import VcioVciso from "./pages/VcioVciso";
-import CaseStudy from "./pages/CaseStudy";
-import BlogPost from "./pages/BlogPost";
-import SecurityGovernance from "./pages/SecurityGovernance";
-import CoManagedIT from "./pages/CoManagedIT";
-import SecurityMonitoring from "./pages/SecurityMonitoring";
-import SecurityAssessments from "./pages/SecurityAssessments";
-import RemoteMonitoring from "./pages/RemoteMonitoring";
-import ThreatDetection from "./pages/ThreatDetection";
-import UserEndpointSecurity from "./pages/UserEndpointSecurity";
-import CloudHome from "./pages/CloudHome";
-import CloudInfrastructure from "./pages/CloudInfrastructure";
-import BackupRecovery from "./pages/BackupRecovery";
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const AiHome = lazy(() => import("./pages/AiHome"));
+const AiReadiness = lazy(() => import("./pages/AiReadiness"));
+const ManagedAi = lazy(() => import("./pages/ManagedAi"));
+const AiGovernance = lazy(() => import("./pages/AiGovernance"));
+const Careers = lazy(() => import("./pages/Careers"));
+const JobDetail = lazy(() => import("./pages/JobDetail"));
+const Resources = lazy(() => import("./pages/Resources"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
+const Cybersecurity = lazy(() => import("./pages/Cybersecurity"));
+const Verticals = lazy(() => import("./pages/Verticals"));
+const IndustryPage = lazy(() => import("./pages/IndustryPage"));
+const ConstructionPage = lazy(() => import("./pages/ConstructionPage"));
+const ProfessionalServicesPage = lazy(() => import("./pages/ProfessionalServicesPage"));
+const FinancialServicesPage = lazy(() => import("./pages/FinancialServicesPage"));
+const NonProfitPage = lazy(() => import("./pages/NonProfitPage"));
+const HealthcarePage = lazy(() => import("./pages/HealthcarePage"));
+const Networking = lazy(() => import("./pages/Networking"));
+const NetworkPerimeterSecurity = lazy(() => import("./pages/NetworkPerimeterSecurity"));
+const Microsoft365 = lazy(() => import("./pages/Microsoft365"));
+const ManagedSupport = lazy(() => import("./pages/ManagedSupport"));
+const VcioVciso = lazy(() => import("./pages/VcioVciso"));
+const CaseStudy = lazy(() => import("./pages/CaseStudy"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const SecurityGovernance = lazy(() => import("./pages/SecurityGovernance"));
+const CoManagedIT = lazy(() => import("./pages/CoManagedIT"));
+const SecurityMonitoring = lazy(() => import("./pages/SecurityMonitoring"));
+const SecurityAssessments = lazy(() => import("./pages/SecurityAssessments"));
+const RemoteMonitoring = lazy(() => import("./pages/RemoteMonitoring"));
+const ThreatDetection = lazy(() => import("./pages/ThreatDetection"));
+const UserEndpointSecurity = lazy(() => import("./pages/UserEndpointSecurity"));
+const CloudHome = lazy(() => import("./pages/CloudHome"));
+const CloudInfrastructure = lazy(() => import("./pages/CloudInfrastructure"));
+const BackupRecovery = lazy(() => import("./pages/BackupRecovery"));
 import ContactModal from "./components/ContactModal";
 import SampleReportModal from "./components/SampleReportModal";
-import AssessmentPage from "./pages/AssessmentPage";
+const AssessmentPage = lazy(() => import("./pages/AssessmentPage"));
 import ReviewMode from "./components/review/ReviewMode";
-import LiveEditProvider from "./components/editor/LiveEditProvider";
+import LiveEditProvider, { holdFirstPaint } from "./components/editor/LiveEditProvider";
 const LiveEditor = lazy(() => import("./components/editor/LiveEditor"));
 import { SeoProvider, SeoController } from "./lib/SeoContext";
 import ImageReveal from "./components/ImageReveal";
@@ -143,6 +146,13 @@ function CtaInterceptor({ onContact, onSample }) {
   return null;
 }
 
+// Shown while a page's bundle is loading. On the first page of a visit it also keeps the page
+// hidden (see le-wait in index.html) until that bundle has arrived, so nothing half-built flashes.
+function PageLoading() {
+  useEffect(() => holdFirstPaint(), []);
+  return null;
+}
+
 function App() {
   const [contactOpen, setContactOpen] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
@@ -159,9 +169,10 @@ function App() {
         <TextReveal />
         <ViewportScale />
         <VisitorTracker />
+        <GtmPageViews />
         <CtaInterceptor onContact={() => setContactOpen(true)} onSample={() => setSampleOpen(true)} />
         <LiveEditProvider>
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutUs />} />

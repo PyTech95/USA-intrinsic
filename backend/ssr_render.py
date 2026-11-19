@@ -16,10 +16,12 @@ def _paras(text) -> list:
 
 
 def _meta_head(template: str, *, title: str, description: str, canonical: str,
-               robots: str, og_image: str, og_type: str, extra_ld: list) -> str:
+               robots: str, og_image: str, og_type: str, extra_ld: list, keywords: str = "") -> str:
     html = template
     html = re.sub(r"<title>[\s\S]*?</title>", f"<title>{esc(title)}</title>", html, count=1)
     html = re.sub(r'<meta name="description"[^>]*>', f'<meta name="description" content="{esc(description)}" />', html, count=1)
+    if keywords:
+        html = re.sub(r'<meta name="keywords"[^>]*>', f'<meta name="keywords" content="{esc(keywords)}" />', html, count=1)
     html = re.sub(r'<meta property="og:title"[^>]*>', f'<meta property="og:title" content="{esc(title)}" />', html, count=1)
     html = re.sub(r'<meta property="og:description"[^>]*>', f'<meta property="og:description" content="{esc(description)}" />', html, count=1)
     html = re.sub(r'<meta property="og:url"[^>]*>', f'<meta property="og:url" content="{esc(canonical)}" />', html, count=1)
@@ -61,16 +63,17 @@ async def render(path: str, host: str, db, seo: dict, template: str) -> dict:
             return {"status": 301, "location": base + f"/careers/{slug}"}
         return {"status": 410, "html": _error_html(template, 410, base), "content_type": "text/html; charset=utf-8"}
 
-    og_default = f"{base}/api/og/page.png?title={_q(ROUTES.get(p, {}).get('title', ORG['name']))}&label=Intrinsic%20Technology"
+    og_title = ((seo.get("pages") or {}).get(p) or {}).get("title") or ROUTES.get(p, {}).get("title", ORG["name"])
+    og_default = f"{base}/api/og/page.png?title={_q(og_title)}&label=Intrinsic%20Technology"
 
     # 4) known static routes
     r = ROUTES.get(p)
     if r:
-        meta = {"title": _full_title(r, seo), "description": r["description"], "canonical": base + p,
-                "robots": "index, follow", "og_image": og_default, "og_type": "website"}
+        meta = page_meta(p, r, seo, base, og_default)
         inner, extra_ld = await _static_body(p, r, base, db, seo)
         html = _meta_head(template, title=meta["title"], description=meta["description"], canonical=meta["canonical"],
-                          robots=meta["robots"], og_image=meta["og_image"], og_type=meta["og_type"], extra_ld=extra_ld)
+                          robots=meta["robots"], og_image=meta["og_image"], og_type=meta["og_type"], extra_ld=extra_ld,
+                          keywords=meta["keywords"])
         return {"status": 200, "html": _inject_body(html, inner), "content_type": "text/html; charset=utf-8"}
 
     # 5) dynamic case studies
@@ -104,11 +107,40 @@ def _q(s: str) -> str:
     return quote(str(s or "")[:120])
 
 
-def _full_title(r: dict, seo: dict) -> str:
-    if r.get("kind") == "home":
-        return "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
+def _full_title(r: dict, seo: dict, override: dict = None) -> str:
+    override = override or {}
     tmpl = seo.get("title_template") or "{title} | Intrinsic Technology"
-    return tmpl.replace("{title}", r["title"])
+    custom = (override.get("title") or "").strip()
+    if r.get("kind") == "home":
+        if custom:
+            return tmpl.replace("{title}", custom)
+        return (seo.get("default_title") or "").strip() or "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
+    return tmpl.replace("{title}", custom or r["title"])
+
+
+def page_meta(p: str, r: dict, seo: dict, base: str, og_default: str) -> dict:
+    """Head tags for a standard page. What the admin enters under SEO & GEO > Per-page overrides
+    (seo["pages"][path]) wins over the built-in defaults, exactly as it does in the browser
+    (frontend/src/lib/SeoContext.jsx) — so crawlers reading the page source see the same title
+    and description that visitors' browsers show."""
+    ov = (seo.get("pages") or {}).get(p) or {}
+    text = lambda key: (ov.get(key) or "").strip()
+    if r.get("kind") == "home":
+        description = text("description") or (seo.get("default_description") or "").strip() or r["description"]
+    else:
+        description = text("description") or r["description"]
+    og_image = text("og_image")
+    if og_image and not og_image.startswith("http"):
+        og_image = base + (og_image if og_image.startswith("/") else f"/api/files/{og_image}")
+    return {
+        "title": _full_title(r, seo, ov),
+        "description": description,
+        "keywords": text("keywords") or (seo.get("default_keywords") or "").strip(),
+        "canonical": base + p,
+        "robots": text("robots") or (seo.get("robots_default") or "").strip() or "index, follow",
+        "og_image": og_image or og_default,
+        "og_type": "website",
+    }
 
 
 async def _find_by_slug(coll, slug, include_prev=False, published_only=False):
