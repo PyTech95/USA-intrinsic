@@ -74,7 +74,7 @@ class TestPageSourceSeo:
                  "/service-areas/new-jersey": {"description": "NJ description from the approved pack."}}
         ny, nj = render("/service-areas/new-york", seo(pages)), render("/service-areas/new-jersey", seo(pages))
         assert title(ny) == "Business IT Support NYC | Intrinsic Technology" and description(ny) == "NY description from the approved pack."
-        assert title(nj) == "Managed IT Services in New Jersey | Intrinsic Technology" and description(nj) == "NJ description from the approved pack."
+        assert title(nj) == "Managed IT Services in New Jersey | Intrinsic" and description(nj) == "NJ description from the approved pack."
 
     def test_homepage_uses_site_defaults_or_its_override(self):
         assert title(render("/", seo())) == "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
@@ -86,3 +86,23 @@ class TestPageSourceSeo:
         html = render("/privacy-policy", seo({"/privacy-policy": {"robots": "noindex, follow"}}))
         assert '<meta name="robots" content="noindex, follow" data-ssr="1" />' in html
         assert html.count('name="robots"') == 1
+
+
+class TestNewYorkAndNewJersey:
+    """The two service-area pages carry the title and description from On-page Fix Pack 1."""
+
+    def test_new_york(self):
+        html = render("/service-areas/new-york", seo())
+        assert title(html) == "Managed IT Services NYC | On-site IT Support | Intrinsic"
+        assert description(html) == "Managed IT, cybersecurity and cloud support for New York City organizations, from our 14 Wall Street office. On-site and remote. Talk to our team."
+        assert len(title(html)) <= 60 and 120 <= len(description(html)) <= 155
+
+    def test_new_jersey(self):
+        html = render("/service-areas/new-jersey", seo())
+        assert title(html) == "Managed IT Services in New Jersey | Intrinsic"
+        assert description(html) == "Managed IT, cybersecurity and cloud support for northern New Jersey organizations, on site and remote, with 24/7 monitoring and a help desk."
+        assert len(title(html)) <= 60 and 120 <= len(description(html)) <= 155
+
+    def test_the_heading_on_the_page_is_unchanged(self):
+        assert "Managed IT Services in New York City" in render("/service-areas/new-york", seo())
+        assert "Managed IT Services in New Jersey" in render("/service-areas/new-jersey", seo())

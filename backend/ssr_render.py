@@ -145,6 +145,8 @@ def _full_title(r: dict, seo: dict, override: dict = None) -> str:
         if custom:
             return tmpl.replace("{title}", custom)
         return (seo.get("default_title") or "").strip() or "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
+    if not custom and r.get("seo_title"):
+        return r["seo_title"]          # a full title tag that already carries the brand: used as written
     return tmpl.replace("{title}", custom or r["title"])
 
 

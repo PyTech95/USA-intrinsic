@@ -74,8 +74,10 @@ ROUTES = {
     "/industries/financial-services": {"label": "Financial Services", "kind": "industry", "title": "IT for Financial Services", "description": "Compliance-ready managed IT and security for financial services firms."},
     "/industries/non-profit": {"label": "Non-Profit", "kind": "industry", "title": "IT for Non-Profits", "description": "Affordable, dependable technology for nonprofit organizations."},
     "/industries/healthcare": {"label": "Healthcare", "kind": "industry", "title": "IT for Healthcare", "description": "HIPAA-aligned managed IT and security for healthcare providers."},
-    "/service-areas/new-york": {"label": "New York IT Services", "kind": "location", "title": "Managed IT Services in New York City", "description": "On-site and remote managed IT, cybersecurity, and cloud services for New York City businesses, from our 14 Wall Street headquarters."},
-    "/service-areas/new-jersey": {"label": "New Jersey IT Services", "kind": "location", "title": "Managed IT Services in New Jersey", "description": "Managed IT, cybersecurity, and cloud services for New Jersey businesses, supported from our Paterson, NJ office."},
+    # New York and New Jersey: "title" is the heading on the page; "seo_title" is the title tag from
+    # On-page Fix Pack 1, used as written (it already carries the brand).
+    "/service-areas/new-york": {"label": "New York IT Services", "kind": "location", "title": "Managed IT Services in New York City", "seo_title": "Managed IT Services NYC | On-site IT Support | Intrinsic", "description": "Managed IT, cybersecurity and cloud support for New York City organizations, from our 14 Wall Street office. On-site and remote. Talk to our team."},
+    "/service-areas/new-jersey": {"label": "New Jersey IT Services", "kind": "location", "title": "Managed IT Services in New Jersey", "seo_title": "Managed IT Services in New Jersey | Intrinsic", "description": "Managed IT, cybersecurity and cloud support for northern New Jersey organizations, on site and remote, with 24/7 monitoring and a help desk."},
 }
 
 # Extra intro paragraphs + "what it does / who it's for" for substantive pages.
