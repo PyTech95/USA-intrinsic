@@ -691,7 +691,11 @@ code {
 .mega-panel--right .mega-caret { left: auto; right: 28px; }
 .mega-panel--sm { width: 560px; }
 .mega-grid { columns: 2; column-gap: 0.75rem; }
-.mega-grid > .mega-item { break-inside: avoid; -webkit-column-break-inside: avoid; }
+.mega-grid > .mega-item, .mega-grid > .mega-item-block { break-inside: avoid; -webkit-column-break-inside: avoid; }
+/* Sub-links under a dropdown item (e.g. About > Resources and Insights > Articles and insights) */
+.mega-sub { display: flex; flex-direction: column; margin: 0.05rem 0 0.45rem 1.35rem; padding-left: 0.2rem; border-left: 1px solid #d9e1ec; }
+.mega-sub-link { font-size: 13.5px; line-height: 1.35; color: #3d4a5f; padding: 0.3rem 0.7rem; border-radius: 2px; transition: color 0.2s ease, background 0.2s ease; overflow-wrap: anywhere; }
+.mega-sub-link:hover { color: #084c98; background: #eef4fb; }
 .mega-item-title, .mega-item-desc { overflow-wrap: anywhere; }
 .mega-item {
   display: flex; align-items: flex-start; gap: 0.6rem;

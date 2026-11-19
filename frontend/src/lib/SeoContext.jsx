@@ -73,8 +73,10 @@ export function SeoController() {
     if (detail) {
       // A page that supplies its own SEO (service areas, articles, case studies) still yields to
       // what the admin entered for that exact address under SEO & GEO > Per-page overrides.
+      // An article's SEO title that already carries the brand ("… | Intrinsic") is used as written.
       const detailTitle = override.title || detail.title;
-      title = detailTitle ? tmpl.replace("{title}", detailTitle) : settings.default_title;
+      const exact = !override.title && detail.titleExact;
+      title = detailTitle ? (exact ? detailTitle : tmpl.replace("{title}", detailTitle)) : settings.default_title;
       description = override.description || detail.description || settings.default_description;
       keywords = override.keywords || detail.keywords || settings.default_keywords;
       image = override.og_image || detail.image || settings.default_og_image;
@@ -106,13 +108,17 @@ export function SeoController() {
       // Breadcrumb for every non-home page (SEO + GEO navigation context)
       const parts = pathname.split("/").filter(Boolean);
       const items = [{ "@type": "ListItem", position: 1, name: "Home", item: base + "/" }];
-      let acc = "";
-      parts.forEach((seg, i) => {
-        acc += "/" + seg;
-        const def = SEO_ROUTE_MAP[acc];
-        const name = (def && def.label) || seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-        items.push({ "@type": "ListItem", position: i + 2, name, item: base + acc });
-      });
+      if (detail && Array.isArray(detail.breadcrumb) && detail.breadcrumb.length) {
+        detail.breadcrumb.forEach((c, i) => items.push({ "@type": "ListItem", position: i + 2, name: c.name, item: base + c.path }));
+      } else {
+        let acc = "";
+        parts.forEach((seg, i) => {
+          acc += "/" + seg;
+          const def = SEO_ROUTE_MAP[acc];
+          const name = (def && def.label) || seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+          items.push({ "@type": "ListItem", position: i + 2, name, item: base + acc });
+        });
+      }
       jsonLd.push({ "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items });
       // Service schema for service pages
       if (pathname.startsWith("/services/") && routeDef) {

@@ -2,6 +2,7 @@ import React from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { ScrollProgress, Reveal } from "../components/common";
+import RelatedArticle, { ARTICLES } from "../components/shared/RelatedArticle";
 import { AiEyebrow, GoldBtn, NavyBtn, MiniArt, C } from "../components/ai/AiGraphics";
 import { ImageMotion } from "../components/cyber/ImageMotion";
 
@@ -158,6 +159,7 @@ const CTA = () => (
         <p className="ai-p">We'll begin by understanding your current IT function, the responsibilities your team manages today, and where additional resources would strengthen the operation.</p>
         <p className="ai-p mt-4">From there, Intrinsic can define a co-managed model with clear responsibilities and the appropriate combination of operational support and specialist expertise.</p>
         <div className="mt-8"><GoldBtn testId="comanaged-cta-btn">Talk to Our Team</GoldBtn></div>
+        <RelatedArticle items={[ARTICLES.partner, ARTICLES.cybersecurity]} testId="comanaged-related-article" />
       </Reveal>
     </div>
   </section>

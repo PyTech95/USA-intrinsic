@@ -7,6 +7,7 @@ import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
 import { ImageMotion } from "../components/cyber/ImageMotion";
 import { Eyebrow, H2 } from "../components/industry/IndustrySections";
+import RelatedArticle, { ARTICLES } from "../components/shared/RelatedArticle";
 const BLUE = "#1e3f9e", INK = "#2f4a8f";
 const light = { "--type-eyebrow-ink": "#d48a12", "--type-section-ink": BLUE, "--type-body-ink": INK, "--type-small-ink": INK, "--type-subheading-ink": BLUE };
 const Art = ({ src, alt, testId, max, w, h }) => <img src={src} alt={alt} className="w-full h-auto" style={{ maxWidth: max }} width={w} height={h} data-testid={testId} />;
@@ -157,6 +158,7 @@ const CTA = () => (
         <h2 className="font-serif text-white text-[32px] sm:text-[40px] leading-[1.12]">Strengthen Your Security Program</h2>
         <p className="text-white/90 text-[15px] leading-[1.6] mt-5">Intrinsic evaluates your technology environment, existing controls and areas of risk—then establishes practical priorities, defined responsibility and an ongoing plan for strengthening security.</p>
         <div className="mt-8"><AssessBtn testId="cyber-cta-btn" /></div>
+        <RelatedArticle items={[ARTICLES.cybersecurity]} testId="cyber-related-article" tone="dark" />
       </Reveal>
       <Reveal delay={120} className="hidden lg:flex lg:col-span-5 justify-end">
         <ImageMotion paths={[{ d: "M981 460 L1112 460", dur: 2.6, r: 6 }]} pulses={[[981, 460], [1112, 460]]} pulseR={9} className="w-full" src="/images/cy-cta.png" alt="Rising panels — people, ideas, secure progress" testId="cyber-cta-image" max={420} w={1395} h={989} />

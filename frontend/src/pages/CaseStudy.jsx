@@ -59,7 +59,7 @@ export default function CaseStudy() {
         {list && !cs ? (
           <section className="container-x py-24 text-center" data-testid="case-study-missing">
             <h1 className="font-serif font-semibold text-[32px] text-royal">This case study is not published yet.</h1>
-            <Link to="/resources#case-studies" className="btn-amber mt-8 inline-flex"><span>Back to Resources</span><span className="btn-arrow"><ArrowRight size={14} /></span></Link>
+            <Link to="/resources#case-studies" className="btn-amber mt-8 inline-flex"><span>Back to Resources and Insights</span><span className="btn-arrow"><ArrowRight size={14} /></span></Link>
           </section>
         ) : cs ? (
           <>
@@ -67,7 +67,7 @@ export default function CaseStudy() {
             <section className="no-hero-fill pt-6 lg:pt-10" data-testid="case-study-header">
               <div className="mx-auto w-full max-w-[1000px] px-6 lg:px-10">
                 <div className="flex flex-wrap items-center gap-2 text-[12px] font-sans">
-                  <Link to="/resources" className="font-bold tracking-[0.14em] uppercase text-navy hover:text-royal transition-colors" data-testid="case-study-back">Case Studies</Link>
+                  <Link to="/resources#case-studies" className="font-bold tracking-[0.14em] uppercase text-navy hover:text-royal transition-colors" data-testid="case-study-back">Case Studies</Link>
                   {cs.tag && <span className="text-slatesage">/ {cs.tag}</span>}
                 </div>
                 <Reveal>

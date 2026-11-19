@@ -4,11 +4,26 @@ import re
 from ssr import (ROUTES, INTRO, FAQS, REDIRECTS, OLD_JOB_PATHS, ORG, PREFERRED_BASE,
                  esc, titlecase, normalize, breadcrumb_ld, faq_ld, _ld,
                  _nav_and_contact, _faq_html, _crumbs_html)
+import md_html
+
+# Service pages that link to a published article (rendered only while that article is published).
+_PARTNER = ("choosing-it-services-partner", "Choosing an IT services partner")
+_CYBER = ("cybersecurity-managed-it", "Cybersecurity as part of effective IT management")
+RELATED_ARTICLES = {
+    "/services/managed-it": [_PARTNER, _CYBER],
+    "/services/co-managed-it": [_PARTNER, _CYBER],
+    "/services/cybersecurity": [_CYBER],
+}
 
 
 def _slug(s: str) -> str:
     s = (s or "").lower().replace("&", "and")
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+
+
+def _blog_slug(post: dict) -> str:
+    """Canonical article slug: the custom slug if set, else derived from the title."""
+    return _slug(post.get("slug") or "") or _slug(post.get("title", ""))
 
 
 def _paras(text) -> list:
@@ -86,9 +101,12 @@ async def render(path: str, host: str, db, seo: dict, template: str) -> dict:
     # 6) dynamic blog posts (published only)
     if p.startswith("/blog/"):
         slug = p.split("/blog/", 1)[1]
-        post = await _find_by_slug(db.blogs, slug, published_only=True)
+        post = await _find_blog(db, slug)
         if post:
-            return _dynamic_page(template, base, p, _blog_view(post, base))
+            canonical = f"/blog/{_blog_slug(post)}"
+            if p != canonical:
+                return {"status": 301, "location": base + canonical}
+            return _dynamic_page(template, base, p, _blog_view(post, base), crumbs_ld=_article_crumbs_ld(post, base))
 
     # 7) dynamic job detail
     if p.startswith("/careers/") and p != "/careers":
@@ -153,6 +171,13 @@ async def _find_by_slug(coll, slug, include_prev=False, published_only=False):
     return None
 
 
+async def _find_blog(db, slug):
+    """Published article by custom slug first, then by title slug or id."""
+    posts = [doc async for doc in db.blogs.find({"published": True}, {"_id": 0})]
+    return (next((d for d in posts if _blog_slug(d) == slug), None)
+            or next((d for d in posts if _slug(d.get("title", "")) == slug or d.get("id") == slug), None))
+
+
 async def _static_body(p: str, r: dict, base: str, db, seo: dict):
     kind = r.get("kind")
     extra_ld = [] if p == "/" else [breadcrumb_ld(p, base)]
@@ -186,6 +211,29 @@ async def _static_body(p: str, r: dict, base: str, db, seo: dict):
             extra_ld.append({"@context": "https://schema.org", "@type": "Service", "name": r["title"],
                              "description": r["description"], "serviceType": r["title"],
                              "provider": {"@id": base + "/#organization"}, "areaServed": "US", "url": base + p})
+        if kind == "resources":
+            articles, guides = [], []
+            async for b in db.blogs.find({"published": True}, {"_id": 0}).sort("order", 1):
+                item = f'<li><a href="/blog/{esc(_blog_slug(b))}">{esc(b.get("title"))}</a>{(" — " + esc(b["excerpt"][:160])) if b.get("excerpt") else ""}</li>'
+                (guides if str(b.get("resource_type") or "").lower() in ("guide", "checklist") else articles).append(item)
+            cases = []
+            async for c in db.case_studies.find({}, {"_id": 0, "title": 1, "summary": 1, "stat": 1}).sort("order", 1):
+                cases.append(f'<li><a href="/case-studies/{_slug(c.get("title", ""))}">{esc(c.get("title"))}</a>{(" — " + esc((c.get("summary") or c.get("stat") or "")[:160])) if (c.get("summary") or c.get("stat")) else ""}</li>')
+            briefs = []
+            async for s in db.service_briefs.find({"available": {"$ne": False}}, {"_id": 0, "title": 1, "summary": 1, "subtitle": 1}).sort("order", 1):
+                if s.get("title"):
+                    briefs.append(f'<li>{esc(s["title"])}{(" — " + esc((s.get("summary") or s.get("subtitle") or "")[:160])) if (s.get("summary") or s.get("subtitle")) else ""}</li>')
+            for anchor, heading, items in (("articles", "Articles and insights", articles), ("case-studies", "Case studies", cases),
+                                           ("service-briefs", "Service briefs", briefs), ("guides", "Guides and checklists", guides)):
+                if items:
+                    parts.append(f'<section id="{anchor}" aria-label="{heading}"><h2>{heading}</h2><ul>{"".join(items)}</ul></section>')
+        links = []
+        for slug, label in RELATED_ARTICLES.get(p, []):
+            post = await _find_blog(db, slug)
+            if post:
+                links.append(f'<a href="/blog/{esc(_blog_slug(post))}">{esc(label)}</a>')
+        if links:
+            parts.append(f'<p>Related reading: {" · ".join(links)}</p>')
         if kind == "careers":
             jobs = []
             async for j in db.jobs.find({"published": {"$ne": False}}, {"_id": 0}):
@@ -197,11 +245,11 @@ async def _static_body(p: str, r: dict, base: str, db, seo: dict):
     return "\n".join(x for x in parts if x), extra_ld
 
 
-def _dynamic_page(template, base, p, view):
+def _dynamic_page(template, base, p, view, crumbs_ld=None):
     title, description, body, ld, og_image = view
     html = _meta_head(template, title=title, description=description, canonical=base + p,
                       robots="index, follow", og_image=og_image or f"{base}/api/og/page.png?title={_q(title)}",
-                      og_type="article", extra_ld=[breadcrumb_ld(p, base)] + ld)
+                      og_type="article", extra_ld=[crumbs_ld or breadcrumb_ld(p, base)] + ld)
     return {"status": 200, "html": _inject_body(html, body), "content_type": "text/html; charset=utf-8"}
 
 
@@ -231,22 +279,37 @@ def _case_study_view(cs, base):
     return title, desc, "\n".join(sec), ld, og
 
 
+def _article_trail(post):
+    """Articles sit under Resources and Insights: Home / Resources and Insights / <title>."""
+    return [("/", "Home"), ("/resources", ROUTES["/resources"]["label"]), (f"/blog/{_blog_slug(post)}", post.get("title") or "Article")]
+
+
+def _article_crumbs_ld(post, base):
+    return {"@context": "https://schema.org", "@type": "BreadcrumbList",
+            "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": name, "item": base + path}
+                                for i, (path, name) in enumerate(_article_trail(post))]}
+
+
 def _blog_view(post, base):
-    slug = _slug(post.get("title", ""))
-    title = (post.get("seo_title") or post.get("title")) + " | Intrinsic Technology"
-    desc = (post.get("seo_description") or post.get("geo_summary") or post.get("excerpt") or str(post.get("content") or "")[:180])[:300]
+    slug = _blog_slug(post)
+    title = post.get("seo_title") or post.get("title") or ""
+    if "|" not in title:                      # an SEO title that already carries the brand is used as written
+        title += " | Intrinsic Technology"
+    desc = (post.get("seo_description") or post.get("geo_summary") or post.get("excerpt") or md_html.to_text(post.get("content"))[:180])[:300]
     og = post.get("og_image") or f"{base}/api/og/blogs/{slug}.png"
-    sec = [_crumbs_html(f"/blog/{slug}"), f"<h1>{esc(post.get('title'))}</h1>"]
+    crumbs = " / ".join(f'<a href="{path}">{esc(name)}</a>' for path, name in _article_trail(post))
+    sec = [f'<nav aria-label="Breadcrumb">{crumbs}</nav>', f"<h1>{esc(post.get('title'))}</h1>"]
     if post.get("author"):
         sec.append(f'<p>By {esc(post["author"])}{(" · " + esc(post.get("date"))) if post.get("date") else ""}</p>')
     if post.get("excerpt"):
         sec.append(f"<p>{esc(post['excerpt'])}</p>")
-    for para in _paras(post.get("content")):
-        sec.append(f"<p>{esc(para)}</p>")
+    if post.get("content"):                   # Markdown body -> real headings, lists and crawlable links
+        sec.append(f"<article>{md_html.to_html(post['content'])}</article>")
     sec.append(_nav_and_contact(base))
-    ld = [{"@context": "https://schema.org", "@type": "BlogPosting", "headline": post.get("seo_title") or post.get("title"),
-           "description": desc, "image": og, "datePublished": post.get("date") or post.get("created_at") or None,
-           "author": {"@type": "Person", "name": post.get("author") or ORG["name"]},
+    author = post.get("author") or ORG["name"]
+    ld = [{"@context": "https://schema.org", "@type": "BlogPosting", "headline": post.get("title") or post.get("seo_title"),
+           "description": desc, "image": og, "datePublished": post.get("created_at") or post.get("date") or None,
+           "author": {"@type": "Organization" if "intrinsic" in author.lower() else "Person", "name": author},
            "publisher": {"@type": "Organization", "name": ORG["name"]}, "articleSection": post.get("category") or None,
            "mainEntityOfPage": base + f"/blog/{slug}"}]
     return title, desc, "\n".join(sec), ld, og

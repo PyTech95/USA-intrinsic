@@ -1,7 +1,26 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Link } from "react-router-dom";
 import { imgUrl } from "../lib/api";
+
+// Links to our own site (relative, or absolute intrinsicamerica.com URLs) stay in the same tab
+// and use client-side navigation; everything else opens in a new tab.
+const OWN_SITE = /^https?:\/\/(www\.)?intrinsicamerica\.com(?=\/|$|[?#])/i;
+export const internalPath = (href = "") => {
+  const h = String(href || "").trim();
+  if (h.startsWith("/") && !h.startsWith("//")) return h;
+  if (OWN_SITE.test(h)) return h.replace(OWN_SITE, "") || "/";
+  return "";
+};
+
+const LINK_CLASS = "text-navy underline underline-offset-4 hover:text-royal transition-colors";
+const MdLink = ({ href, node, ...p }) => {
+  const to = internalPath(href);
+  if (to && !to.startsWith("/api/")) return <Link to={to} className={LINK_CLASS} {...p} />;
+  const external = /^https?:/i.test(href || "");
+  return <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className={LINK_CLASS} {...p} />;
+};
 
 // Styled markdown renderer for article bodies.
 export default function Markdown({ children, className = "" }) {
@@ -14,7 +33,7 @@ export default function Markdown({ children, className = "" }) {
           h2: (p) => <h2 className="font-serif font-semibold text-[24px] sm:text-[27px] leading-snug text-royal mt-11 mb-4" {...p} />,
           h3: (p) => <h3 className="font-serif font-semibold text-[20px] sm:text-[22px] leading-snug text-midnight mt-9 mb-3" {...p} />,
           p: (p) => <p className="text-[#2e3745] text-[16.5px] leading-[1.85] my-5" {...p} />,
-          a: ({ href, ...p }) => <a href={href} target={href?.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" className="text-navy underline underline-offset-4 hover:text-royal transition-colors" {...p} />,
+          a: MdLink,
           ul: (p) => <ul className="list-disc pl-6 my-5 space-y-2 text-[#2e3745] text-[16.5px] leading-[1.75]" {...p} />,
           ol: (p) => <ol className="list-decimal pl-6 my-5 space-y-2 text-[#2e3745] text-[16.5px] leading-[1.75]" {...p} />,
           li: (p) => <li className="pl-1" {...p} />,

@@ -1,0 +1,45 @@
+/* Visual article editor (admin). The typography mirrors components/Markdown.jsx so the
+   article looks the same here as it does on the website. */
+.rte-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.rte-content {
+  min-height: 320px;
+  padding: 18px 22px 28px;
+  outline: none;
+  @apply font-sans;
+}
+.rte-content > :first-child { margin-top: 0; }
+
+.rte-content p { @apply text-[#2e3745] text-[16.5px] leading-[1.85] my-5; }
+.rte-content h1 { @apply font-serif font-semibold text-[26px] sm:text-[30px] leading-snug text-royal mt-12 mb-4; }
+.rte-content h2 { @apply font-serif font-semibold text-[24px] sm:text-[27px] leading-snug text-royal mt-11 mb-4; }
+.rte-content h3 { @apply font-serif font-semibold text-[20px] sm:text-[22px] leading-snug text-midnight mt-9 mb-3; }
+.rte-content strong { @apply font-semibold text-midnight; }
+.rte-content h1 strong,
+.rte-content h2 strong,
+.rte-content h3 strong { color: inherit; font-weight: inherit; }   /* headings are already bold */
+.rte-content em { @apply italic; }
+.rte-content a { @apply text-navy underline underline-offset-4 cursor-text; }
+.rte-content ul { @apply list-disc pl-6 my-5 text-[#2e3745] text-[16.5px] leading-[1.75]; }
+.rte-content ol { @apply list-decimal pl-6 my-5 text-[#2e3745] text-[16.5px] leading-[1.75]; }
+.rte-content li { @apply pl-1 my-2; }
+.rte-content li > p { margin: 0; line-height: inherit; }
+.rte-content li > ul,
+.rte-content li > ol { @apply my-2; }
+.rte-content blockquote { @apply border-l-[3px] border-[#f2a91c] pl-6 my-7 font-serif italic text-royal; }
+.rte-content blockquote p { @apply text-royal text-[20px] sm:text-[22px] leading-[1.5] my-2; }
+.rte-content hr { @apply my-10 border-powder/70; }
+.rte-content code { @apply bg-ice px-1.5 py-0.5 text-[14px] font-mono text-navy border border-powder; }
+.rte-content pre { @apply block bg-[#0d2144] text-white p-4 my-6 text-[14px] font-mono overflow-x-auto; }
+.rte-content pre code { background: none; border: 0; padding: 0; color: inherit; }
+.rte-content img { @apply w-full h-auto my-7 border border-powder; }
+.rte-content img.ProseMirror-selectednode { outline: 2px solid #084c98; outline-offset: 2px; }
+
+.rte-content table { @apply w-full text-[15px] border-collapse my-6; table-layout: fixed; }
+.rte-content th { @apply border border-powder bg-ice px-3 py-2 text-left font-semibold text-midnight align-top; }
+.rte-content td { @apply border border-powder px-3 py-2 text-[#2e3745] align-top; }
+.rte-content th > p,
+.rte-content td > p { margin: 0; font-size: inherit; line-height: 1.6; color: inherit; }
+.rte-content .selectedCell { background: #dfe9f7; }

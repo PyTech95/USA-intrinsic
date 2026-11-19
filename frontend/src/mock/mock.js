@@ -34,7 +34,13 @@ export const nav = [
     { label: "Construction", to: "/industries/construction", desc: "IT that keeps job sites connected." },
   ] },
   { label: "About", to: "/about", items: [
-    { label: "Resources", to: "/resources", desc: "Guides, insights, and case studies." },
+    // "children" are the sub-links shown under this item in the dropdown (they open the matching list on the page)
+    { label: "Resources and Insights", to: "/resources", desc: "Guides, insights, and case studies.", children: [
+      { label: "Articles and insights", to: "/resources#articles" },
+      { label: "Case studies", to: "/resources#case-studies" },
+      { label: "Service briefs", to: "/resources#service-briefs" },
+      { label: "Guides and checklists", to: "/resources#guides" },
+    ] },
     { label: "Contact", to: "/contact", desc: "Reach our team directly." },
   ] },
 ];
@@ -304,7 +310,7 @@ export const footer = {
   tagline: "Managed IT, Cybersecurity, and Cloud Services",
   columns: [
     { title: "ABOUT", links: [
-      { label: "About Us", to: "/about" }, { label: "Resources", to: "/resources" }, { label: "Careers", to: "/careers" }, { label: "Contact Us", to: "/contact" },
+      { label: "About Us", to: "/about" }, { label: "Resources and Insights", to: "/resources" }, { label: "Careers", to: "/careers" }, { label: "Contact Us", to: "/contact" },
     ] },
     { title: "SERVICES", links: [
       { label: "Cybersecurity", to: "/services/cybersecurity" }, { label: "Managed IT", to: "/services/managed-it" }, { label: "Cloud", to: "/services/cloud" }, { label: "AI", to: "/services/ai" },

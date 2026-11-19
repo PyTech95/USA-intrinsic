@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import PageFaqs from "../components/PageFaqs";
 import { ScrollProgress, Reveal } from "../components/common";
+import RelatedArticle, { ARTICLES } from "../components/shared/RelatedArticle";
 import { AiEyebrow, GoldBtn, NavyBtn, ExploreLink, Mosaic, MiniArt, PhotoBand, C } from "../components/ai/AiGraphics";
 
 const SERVICES = [
@@ -154,6 +155,7 @@ const CTA = () => (
         <p className="ai-p">We'll begin by understanding your current technology environment, how IT responsibilities are managed today, and where additional ownership, capacity, or expertise is required.</p>
         <p className="ai-p mt-4">From there, we can define the service model and capabilities that best align with your organization.</p>
         <div className="mt-8"><GoldBtn testId="managed-cta-btn">Talk to Our Team</GoldBtn></div>
+        <RelatedArticle items={[ARTICLES.partner, ARTICLES.cybersecurity]} testId="managed-related-article" />
       </Reveal>
     </div>
   </section>

@@ -2,7 +2,7 @@
 export const SEO_ROUTES = [
   { path: "/", label: "Home", title: "Managed IT, Cybersecurity & Cloud Services", description: "Complete oversight of your technology environment—proactive monitoring, infrastructure management, and strategic guidance to keep operations secure and resilient." },
   { path: "/about", label: "About Us", title: "About Intrinsic Technology", description: "A women-owned and minority-owned managed service provider in New York City delivering accountable, coordinated technology services." },
-  { path: "/resources", label: "Resources", title: "Resources, Insights & Case Studies", description: "Practical insights, service briefs, and client case studies to help you make better technology decisions." },
+  { path: "/resources", label: "Resources and Insights", title: "Resources and Insights", description: "Practical insights, service briefs, and client case studies to help you make better technology decisions." },
   { path: "/careers", label: "Careers", title: "Careers at Intrinsic Technology", description: "Join a technology team focused on security, reliability, and real client outcomes." },
   { path: "/contact", label: "Contact", title: "Talk to an Expert", description: "Get in touch with Intrinsic Technology to discuss managed IT, cybersecurity, cloud, and AI services." },
   { path: "/privacy-policy", label: "Privacy Policy", title: "Privacy Policy", description: "How Intrinsic Technology collects, uses, and protects your information." },

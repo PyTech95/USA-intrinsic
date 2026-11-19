@@ -42,7 +42,7 @@ def titlecase(seg: str) -> str:
 ROUTES = {
     "/": {"label": "Home", "kind": "home", "title": "Managed IT, Cybersecurity & Cloud Services", "description": "Intrinsic Technology delivers Managed IT, cybersecurity, and cloud services for NYC-area businesses—proactive monitoring, infrastructure management, and strategic guidance."},
     "/about": {"label": "About Us", "kind": "page", "title": "About Intrinsic Technology", "description": "Intrinsic Technology is a women-owned and minority-owned managed service provider in New York City delivering accountable, coordinated technology services."},
-    "/resources": {"label": "Resources", "kind": "page", "title": "Resources, Insights & Case Studies", "description": "Practical insights, service briefs, and client case studies from Intrinsic Technology to help you make better technology decisions."},
+    "/resources": {"label": "Resources and Insights", "kind": "resources", "title": "Resources and Insights", "description": "Practical insights, service briefs, and client case studies from Intrinsic Technology to help you make better technology decisions."},
     "/careers": {"label": "Careers", "kind": "careers", "title": "Careers at Intrinsic Technology", "description": "Explore current openings at Intrinsic Technology—a New York City MSP focused on security, reliability, and real client outcomes."},
     "/contact": {"label": "Contact", "kind": "contact", "title": "Talk to an Expert", "description": "Contact Intrinsic Technology to discuss managed IT, cybersecurity, cloud, and AI services. Call 212.643.4808 or email consulting@intrinsicamerica.com."},
     "/privacy-policy": {"label": "Privacy Policy", "kind": "page", "title": "Privacy Policy", "description": "How Intrinsic Technology collects, uses, and protects your information."},
@@ -157,6 +157,8 @@ REDIRECTS = {
     "/services/managed-support": "/services/managed-it",
     "/services/managed-it-services": "/services/managed-it",
     "/services/ai-automation": "/services/ai",
+    # Articles are listed on the Resources and Insights page (there is no separate blog index)
+    "/blog": "/resources",
 }
 # Old individual job URLs: redirect to Careers only where a relevant role exists,
 # otherwise return 410 (gone). Checked against live jobs at request time.
@@ -196,7 +198,7 @@ def _nav_and_contact(base: str) -> str:
     links = [("/services/managed-it", "Managed IT"), ("/services/cybersecurity", "Cybersecurity"),
              ("/services/cloud", "Cloud"), ("/services/ai", "AI & Automation"),
              ("/services/vcio-vciso", "vCIO & vCISO"), ("/industries", "Industries"),
-             ("/about", "About"), ("/resources", "Resources"), ("/contact", "Contact")]
+             ("/about", "About"), ("/resources", "Resources and Insights"), ("/contact", "Contact")]
     nav = "".join(f'<li><a href="{h}">{esc(t)}</a></li>' for h, t in links)
     offices = "".join(f"<li>{esc(label)}: {esc(street)}, {esc(city)}, {esc(region)} {esc(zc)}</li>" for label, street, city, region, zc in OFFICES)
     return (f'<nav aria-label="Primary"><ul>{nav}</ul></nav>'

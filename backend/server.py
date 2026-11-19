@@ -40,6 +40,8 @@ from scripts.seed_professional_services_case_study import UPDATE as PROFESSIONAL
 from scripts.seed_communications_case_study import UPDATE as COMMUNICATIONS_CASE_STUDY
 from scripts.seed_manufacturing_case_study import UPDATE as MANUFACTURING_CASE_STUDY
 from scripts.seed_legal_case_study import UPDATE as LEGAL_CASE_STUDY
+from content_updates import apply_content_updates
+import docx_import
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -478,11 +480,17 @@ async def list_content(name: str):
 async def list_admin_content(name: str, admin: dict = Depends(get_current_admin)):
     return await coll(name).find({}, {"_id": 0}).sort("order", 1).to_list(1000)
 
+def _clean_blog_fields(body: dict) -> None:
+    """Blogs may carry a custom URL slug; keep it URL-safe (blank = derive from the title)."""
+    if "slug" in body:
+        body["slug"] = _slugify_py(str(body.get("slug") or ""))
+
 @api_router.post("/content/{name}")
 async def create_content(name: str, body: dict, admin: dict = Depends(get_current_admin)):
     c = coll(name)
     if name == "blogs":
         body.setdefault("published", False)
+        _clean_blog_fields(body)
     last = await c.find_one({}, {"_id": 0, "order": 1}, sort=[("order", -1)])
     body["id"] = str(uuid.uuid4())
     body["order"] = (last["order"] + 1) if last and "order" in last else 0
@@ -495,6 +503,8 @@ async def create_content(name: str, body: dict, admin: dict = Depends(get_curren
 async def update_content(name: str, item_id: str, body: dict, admin: dict = Depends(get_current_admin)):
     body.pop("_id", None)
     body.pop("id", None)
+    if name == "blogs":
+        _clean_blog_fields(body)
     res = await coll(name).update_one({"id": item_id}, {"$set": body})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
@@ -505,6 +515,45 @@ async def update_content(name: str, item_id: str, body: dict, admin: dict = Depe
 async def delete_content(name: str, item_id: str, admin: dict = Depends(get_current_admin)):
     await coll(name).delete_one({"id": item_id})
     return {"deleted": True}
+
+# ---- Import a blog post from a Word (.docx) file ----
+@api_router.post("/import/docx")
+async def import_docx(file: UploadFile = File(...), admin: dict = Depends(get_current_admin)):
+    """Read a Word article and return a ready-to-review draft post (nothing is saved or published here).
+    Images inside the document are uploaded to storage so the draft body can show them."""
+    data = await file.read()
+    try:
+        result = await asyncio.to_thread(docx_import.docx_to_post, data, file.filename or "")
+    except docx_import.DocxImportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    post, notes = result["post"], list(result["notes"])
+    content = post["content"]
+    for i, image in enumerate(result["images"]):
+        placeholder = docx_import.image_placeholder(i)
+        ctype = image.get("content_type") or "image/png"
+        ext = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(ctype)
+        stored = ""
+        if ext:
+            try:
+                path = f"{APP_NAME}/uploads/{uuid.uuid4()}.{ext}"
+                saved = await asyncio.to_thread(put_object, path, image["data"], ctype)
+                await db.files.insert_one({"id": str(uuid.uuid4()), "storage_path": saved["path"], "content_type": ctype,
+                                           "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()})
+                stored = saved["path"]
+            except Exception as e:
+                logger.error(f"Word import: image {i} upload failed: {e}")
+        if stored:
+            content = content.replace(f"]({placeholder})", f"]({stored})")
+        else:
+            content = _re.sub(r"!\[[^\]]*\]\(" + _re.escape(placeholder) + r"\)\s*", "", content)
+            notes.append("One image could not be imported (unsupported format). Add it from the editor toolbar.")
+    post["content"] = content
+    post["date"] = datetime.now(timezone.utc).strftime("%d %b %Y")
+    taken = await db.blogs.find_one({"$or": [{"slug": post["slug"]}, {"title": post["title"]}]}, {"_id": 0, "title": 1})
+    if taken:
+        notes.append(f'An article with this title or URL already exists ("{taken.get("title", "")}"). '
+                     "Saving this draft will create a second one — delete the old one or change the URL slug.")
+    return {"post": post, "notes": notes, "stats": result["stats"], "proposed_path": result.get("proposed_path", "")}
 
 # ---- Site content (hero + section headings) ----
 DEFAULT_SITE = {
@@ -586,6 +635,10 @@ def _slugify_py(s: str) -> str:
     s = _re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-")
 
+def _blog_slug(doc: dict) -> str:
+    """Canonical URL slug of an article: the custom slug if set, else derived from the title."""
+    return _slugify_py(doc.get("slug") or "") or _slugify_py(doc.get("title", ""))
+
 async def get_seo_settings() -> dict:
     doc = await db.settings.find_one({"key": "seo"}, {"_id": 0, "key": 0}) or {}
     merged = {**DEFAULT_SEO, **doc}
@@ -620,8 +673,8 @@ async def sitemap_xml(request: Request):
         slug = _slugify_py(c.get("title", ""))
         if slug:
             urls.append(f"/case-studies/{slug}")
-    async for b in db.blogs.find({"published": True}, {"title": 1}):
-        slug = _slugify_py(b.get("title", ""))
+    async for b in db.blogs.find({"published": True}, {"title": 1, "slug": 1}):
+        slug = _blog_slug(b)
         if slug:
             urls.append(f"/blog/{slug}")
     async for j in db.jobs.find({"published": True}, {"slug": 1}):
@@ -821,7 +874,8 @@ async def og_image(coll: str, slug: str):
     if not cname:
         raise HTTPException(status_code=404, detail="Unknown collection")
     items = await db[cname].find({}, {"_id": 0}).to_list(1000)
-    item = next((x for x in items if _slugify_py(x.get("title", "")) == slug or x.get("id") == slug), None)
+    item = next((x for x in items if (cname == "blogs" and _blog_slug(x) == slug)
+                 or _slugify_py(x.get("title", "")) == slug or x.get("id") == slug), None)
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
     title = item.get("seo_title") or item.get("title") or "Intrinsic Technology"
@@ -1471,6 +1525,10 @@ async def on_startup():
     await db.typography_presets.create_index('name_key', unique=True)
     await initialize_analytics(db)
     await seed()
+    try:
+        await apply_content_updates(db)
+    except Exception as e:      # never block startup on a content update
+        logger.error(f"Content updates failed: {e}")
     if STORAGE_BACKEND == "local":
         LOCAL_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         logger.info(f"Storage: local disk at {LOCAL_STORAGE_DIR}")

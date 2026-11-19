@@ -10,7 +10,7 @@ const LINKS = [
   { to: "/services/cybersecurity", label: "Cybersecurity" },
   { to: "/services/cloud", label: "Cloud" },
   { to: "/industries", label: "Industries" },
-  { to: "/resources", label: "Resources" },
+  { to: "/resources", label: "Resources and Insights" },
   { to: "/contact", label: "Contact" },
 ];
 

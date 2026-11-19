@@ -191,6 +191,7 @@ function App() {
           <Route path="/services/vcio-vciso" element={<VcioVciso />} />
           <Route path="/resources/service-briefs" element={<Navigate to="/resources#service-briefs" replace />} />
           <Route path="/case-studies/:slug" element={<CaseStudy />} />
+          <Route path="/blog" element={<Navigate to="/resources#articles" replace />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/services/security-governance-compliance" element={<SecurityGovernance />} />
           <Route path="/services/co-managed-it" element={<CoManagedIT />} />
