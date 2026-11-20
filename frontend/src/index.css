@@ -265,6 +265,14 @@ code {
 .areveal { transition: opacity 0.9s cubic-bezier(0.22,1,0.36,1), transform 0.9s cubic-bezier(0.22,1,0.36,1); }
 .areveal:not(.is-in) { opacity: 0; transform: translateY(22px); }
 @media (prefers-reduced-motion: reduce) { .areveal, .areveal:not(.is-in) { opacity: 1; transform: none; transition: none; } }
+
+/* Prerendered pages: show the text at the top of the page at once instead of fading it in.
+   A fade-in that starts invisible is not counted by Google's speed test until the script has
+   replaced the prerendered page, which put "largest contentful paint" at 7 to 9 seconds on every
+   page that opens with it (PageSpeed Insights, 20 Nov 2026: homepage 7.8 s, Managed IT 9.3 s,
+   Contact 7.5 s, Free Security Risk Review 7.4 s; the New York page has no fade-in and shows
+   1.7 s). Only pages served with <html data-prerendered> are affected. */
+html[data-prerendered] .animate-fade-up { animation: none !important; }
 /* Images load in left-to-right, like text revealing */
 .img-reveal { clip-path: inset(0 100% 0 0); opacity: 0; transition: clip-path 1.1s cubic-bezier(0.22,1,0.36,1), opacity 0.5s ease; }
 .img-reveal.is-in { clip-path: inset(0 0 0 0); opacity: 1; }
