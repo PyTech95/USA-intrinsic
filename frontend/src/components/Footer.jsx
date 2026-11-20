@@ -15,7 +15,7 @@ const COLUMNS = [
   [{ title: "Industries", to: byLabel("Industries").to, links: byLabel("Industries").items }],
   [{ title: "Governance", to: byLabel("Governance").to, links: [] },
    { title: "Company", to: "/about", links: [
-     { label: "About", to: "/about" }, { label: "Resources", to: "/resources" }, { label: "Careers", to: "/careers" }, { label: "Contact", to: "/contact" },
+     { label: "About", to: "/about" }, { label: "Resources and Insights", to: "/resources" }, { label: "Careers", to: "/careers" }, { label: "Contact", to: "/contact" },
    ] }],
 ];
 

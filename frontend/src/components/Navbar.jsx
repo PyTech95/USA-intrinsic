@@ -28,8 +28,8 @@ const Navbar = () => {
   const hasMenu = (n) => (n.items && n.items.length > 0) || (n.groups && n.groups.length > 0);
   const primary = nav;
 
-  const renderMegaItem = (it) => (
-    <Link key={it.label} to={it.to} className="mega-item group" data-testid={`nav-item-${it.label}`}>
+  const megaLink = (it) => (
+    <Link key={it.label} to={it.to} onClick={() => setActive(null)} className="mega-item group" data-testid={`nav-item-${it.label}`}>
       <div className="flex-1 min-w-0">
         <span className="mega-item-title">{it.label}</span>
         {it.desc && <span className="mega-item-desc">{it.desc}</span>}
@@ -37,6 +37,17 @@ const Navbar = () => {
       <ArrowUpRight size={16} className="mega-item-arrow" />
     </Link>
   );
+  // An item may carry "children": a short list of sub-links shown directly under it.
+  const renderMegaItem = (it) => (it.children && it.children.length ? (
+    <div key={it.label} className="mega-item-block" data-testid={`nav-block-${it.label}`}>
+      {megaLink(it)}
+      <div className="mega-sub">
+        {it.children.map((c) => (
+          <Link key={c.label} to={c.to} onClick={() => setActive(null)} className="mega-sub-link" data-testid={`nav-item-${c.label}`}>{c.label}</Link>
+        ))}
+      </div>
+    </div>
+  ) : megaLink(it));
 
   return (
     <header
@@ -165,14 +176,26 @@ const Navbar = () => {
                           ))
                         ) : (
                           n.items.map((it) => (
-                            <Link
-                              key={it.label}
-                              to={it.to}
-                              onClick={() => setOpen(false)}
-                              className="py-2.5 text-[15px] text-slatesage hover:text-navy transition-colors"
-                            >
-                              {it.label}
-                            </Link>
+                            <React.Fragment key={it.label}>
+                              <Link
+                                to={it.to}
+                                onClick={() => setOpen(false)}
+                                className="py-2.5 text-[15px] text-slatesage hover:text-navy transition-colors"
+                              >
+                                {it.label}
+                              </Link>
+                              {(it.children || []).map((c) => (
+                                <Link
+                                  key={c.label}
+                                  to={c.to}
+                                  onClick={() => setOpen(false)}
+                                  className="ml-4 pl-3 border-l border-powder py-2 text-[14px] text-slatesage hover:text-navy transition-colors"
+                                  data-testid={`mobile-nav-item-${c.label}`}
+                                >
+                                  {c.label}
+                                </Link>
+                              ))}
+                            </React.Fragment>
                           ))
                         )}
                       </div>

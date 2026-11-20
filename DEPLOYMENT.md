@@ -71,6 +71,19 @@ NOT production numbers.
   inspect representative URLs, confirm canonical selection, add legacy-URL handling.
 - Set `google_site_verification` in the SEO settings (admin) and redeploy, or add the meta tag.
 
+## 7. Release notes — Resources and Insights / articles (Nov 2026)
+- New backend packages (Word import): run `pip install -r backend/requirements.txt` (adds `mammoth`, `beautifulsoup4`), then restart the backend.
+- Rebuild the frontend (Section 1) — run `yarn install` first: the admin article editor adds the `@tiptap/*` packages.
+  The Resources and Insights page, article pages and the admin Blogs screen changed.
+- On the first backend start after this release, the article "What to Look for in an IT Services Partner" is published once
+  at `/blog/choosing-it-services-partner` (see `backend/content_updates.py`). It is dated the day it goes live. Later admin
+  edits, unpublishing or deletion are never overwritten.
+- Posting further articles: Admin > Blogs > "Import from Word" (.docx), or "Add New" and paste the text into the
+  Word-like article editor; review, then "Save & Publish".
+- Unit tests for this release (no server or database needed):
+  `cd backend && python -m pytest tests/test_docx_import.py tests/test_content_updates.py -n 0` (needs `python-docx`, `mongomock-motor`);
+  `cd frontend && yarn test --watchAll=false src/lib/__tests__/richtext.test.js`.
+
 ## Access-dependent items the agent could NOT perform here
 - VPS build/flip, nginx reload, SSL — commands above.
 - Production Lighthouse + live-domain re-checks — Section 4.

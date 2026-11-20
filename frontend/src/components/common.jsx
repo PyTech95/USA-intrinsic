@@ -10,6 +10,7 @@ export const Logo = ({ color, size = 30 }) => {
     <img
       src={white ? logoWhite : logoNavy}
       alt="Intrinsic"
+      width={661} height={180}   // intrinsic size of the file: lets the browser reserve the space before it loads
       style={{ height: size + 10, width: "auto" }}
       className="w-auto max-w-full self-start shrink-0 object-contain select-none"
       data-testid="site-logo"

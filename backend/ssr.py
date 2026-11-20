@@ -42,7 +42,7 @@ def titlecase(seg: str) -> str:
 ROUTES = {
     "/": {"label": "Home", "kind": "home", "title": "Managed IT, Cybersecurity & Cloud Services", "description": "Intrinsic Technology delivers Managed IT, cybersecurity, and cloud services for NYC-area businesses—proactive monitoring, infrastructure management, and strategic guidance."},
     "/about": {"label": "About Us", "kind": "page", "title": "About Intrinsic Technology", "description": "Intrinsic Technology is a women-owned and minority-owned managed service provider in New York City delivering accountable, coordinated technology services."},
-    "/resources": {"label": "Resources", "kind": "page", "title": "Resources, Insights & Case Studies", "description": "Practical insights, service briefs, and client case studies from Intrinsic Technology to help you make better technology decisions."},
+    "/resources": {"label": "Resources and Insights", "kind": "resources", "title": "Resources and Insights", "description": "Practical insights, service briefs, and client case studies from Intrinsic Technology to help you make better technology decisions."},
     "/careers": {"label": "Careers", "kind": "careers", "title": "Careers at Intrinsic Technology", "description": "Explore current openings at Intrinsic Technology—a New York City MSP focused on security, reliability, and real client outcomes."},
     "/contact": {"label": "Contact", "kind": "contact", "title": "Talk to an Expert", "description": "Contact Intrinsic Technology to discuss managed IT, cybersecurity, cloud, and AI services. Call 212.643.4808 or email consulting@intrinsicamerica.com."},
     "/privacy-policy": {"label": "Privacy Policy", "kind": "page", "title": "Privacy Policy", "description": "How Intrinsic Technology collects, uses, and protects your information."},
@@ -74,8 +74,10 @@ ROUTES = {
     "/industries/financial-services": {"label": "Financial Services", "kind": "industry", "title": "IT for Financial Services", "description": "Compliance-ready managed IT and security for financial services firms."},
     "/industries/non-profit": {"label": "Non-Profit", "kind": "industry", "title": "IT for Non-Profits", "description": "Affordable, dependable technology for nonprofit organizations."},
     "/industries/healthcare": {"label": "Healthcare", "kind": "industry", "title": "IT for Healthcare", "description": "HIPAA-aligned managed IT and security for healthcare providers."},
-    "/service-areas/new-york": {"label": "New York IT Services", "kind": "location", "title": "Managed IT Services in New York City", "description": "On-site and remote managed IT, cybersecurity, and cloud services for New York City businesses, from our 14 Wall Street headquarters."},
-    "/service-areas/new-jersey": {"label": "New Jersey IT Services", "kind": "location", "title": "Managed IT Services in New Jersey", "description": "Managed IT, cybersecurity, and cloud services for New Jersey businesses, supported from our Paterson, NJ office."},
+    # New York and New Jersey: "title" is the heading on the page; "seo_title" is the title tag from
+    # On-page Fix Pack 1, used as written (it already carries the brand).
+    "/service-areas/new-york": {"label": "New York IT Services", "kind": "location", "title": "Managed IT Services in New York City", "seo_title": "Managed IT Services NYC | On-site IT Support | Intrinsic", "description": "Managed IT, cybersecurity and cloud support for New York City organizations, from our 14 Wall Street office. On-site and remote. Talk to our team."},
+    "/service-areas/new-jersey": {"label": "New Jersey IT Services", "kind": "location", "title": "Managed IT Services in New Jersey", "seo_title": "Managed IT Services in New Jersey | Intrinsic", "description": "Managed IT, cybersecurity and cloud support for northern New Jersey organizations, on site and remote, with 24/7 monitoring and a help desk."},
 }
 
 # Extra intro paragraphs + "what it does / who it's for" for substantive pages.
@@ -150,20 +152,54 @@ REDIRECTS = {
     "/healthcare": "/industries/healthcare",
     "/terms-conditions": "/terms-of-service",
     "/contact-us": "/contact",
+    "/privacy": "/privacy-policy",          # the browser app already redirected this; crawlers got a 404
     "/jobs": "/careers",
     "/job-openings": "/careers",
     # Alias consolidation (choose canonical destinations)
     "/services/managed-support": "/services/managed-it",
     "/services/managed-it-services": "/services/managed-it",
     "/services/ai-automation": "/services/ai",
+    # Old-site addresses that Search Console reported as "Not found (404)" or still held in its
+    # index on 19 Nov 2026. Each goes to the closest current page.
+    "/home": "/",
+    "/non-profit-organizations": "/industries/non-profit",
+    "/legal-professional-services": "/industries/professional-services",
+    "/banking-finance": "/industries/financial-services",
+    "/cyber-security": "/services/cybersecurity",
+    "/cloud-services": "/services/cloud",
+    "/application-cloud-support": "/services/cloud",
+    "/infrastructure-management": "/services/remote-monitoring-management",
+    "/strategic-projects": "/services/vcio-vciso",
+    "/cost-calculator": "/contact",
+    "/cookie-policy": "/privacy-policy",
+    # Section addresses that have no page of their own. Google finds them through the breadcrumb
+    # trail (Home > Services > Managed IT). The homepage carries the full list of services.
+    "/services": "/",
+    "/case-studies": "/resources",
+    "/service-areas": "/service-areas/new-york",
+    # Articles are listed on the Resources and Insights page (there is no separate blog index)
+    "/blog": "/resources",
 }
-# Old individual job URLs: redirect to Careers only where a relevant role exists,
-# otherwise return 410 (gone). Checked against live jobs at request time.
+# Old job-board listing addresses (/job-location/new-york, /job-category/sales, /job-type/full-time):
+# anything under these goes to Careers.
+REDIRECT_PREFIXES = {
+    "/job-location/": "/careers",
+    "/job-category/": "/careers",
+    "/job-type/": "/careers",
+}
+# Old individual job URLs: redirect to the matching role where one is open, otherwise to
+# Careers. Checked against live jobs at request time.
 OLD_JOB_PATHS = [
     "/jobs/sales-representative", "/jobs/accounting-specialist",
     "/jobs/accounting-and-administrative-assistant", "/jobs/it-support-level-2",
     "/jobs/it-project-manager",
 ]
+
+def is_api_data(path: str, content_type: str) -> bool:
+    """True for the JSON data the pages load from /api/ (never for a page, the sitemap, robots.txt,
+    llms.txt or an image). Used to send "X-Robots-Tag: noindex" with it."""
+    return (path or "").startswith("/api/") and (content_type or "").lower().startswith("application/json")
+
 
 def normalize(path: str) -> str:
     path = (path or "/").split("?")[0].split("#")[0]
@@ -195,7 +231,7 @@ def _nav_and_contact(base: str) -> str:
     links = [("/services/managed-it", "Managed IT"), ("/services/cybersecurity", "Cybersecurity"),
              ("/services/cloud", "Cloud"), ("/services/ai", "AI & Automation"),
              ("/services/vcio-vciso", "vCIO & vCISO"), ("/industries", "Industries"),
-             ("/about", "About"), ("/resources", "Resources"), ("/contact", "Contact")]
+             ("/about", "About"), ("/resources", "Resources and Insights"), ("/contact", "Contact")]
     nav = "".join(f'<li><a href="{h}">{esc(t)}</a></li>' for h, t in links)
     offices = "".join(f"<li>{esc(label)}: {esc(street)}, {esc(city)}, {esc(region)} {esc(zc)}</li>" for label, street, city, region, zc in OFFICES)
     return (f'<nav aria-label="Primary"><ul>{nav}</ul></nav>'

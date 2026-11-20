@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Trash2, Save, Upload, KeyRound, X, Send, Search, RefreshCw, Inbox, FileUser } from "lucide-react";
+import { Plus, Trash2, Save, Upload, KeyRound, X, Send, Search, RefreshCw, Inbox, FileUser, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
 import { AdminLayout, ADMIN_TABS } from "../components/admin/AdminLayout";
 import { AdminOverview } from "../components/admin/AdminOverview";
 import TypographySettings from "../components/editor/TypographySettings";
@@ -10,7 +10,8 @@ import { api, getToken, clearToken, errMsg, imgUrl } from "../lib/api";
 import { FeedbackView } from "./FeedbackView";
 import { ModesView } from "./ModesView";
 import SeoManager from "../components/admin/SeoManager";
-import MarkdownEditor from "../components/admin/MarkdownEditor";
+import RichTextEditor from "../components/admin/RichTextEditor";
+import { blogPath } from "../lib/slug";
 
 const SEO_FIELDS = [
   { k: "seo_title", label: "SEO Title — search & social (blank = use the title above)", type: "text" },
@@ -28,6 +29,12 @@ const SCHEMAS = {
       { k: "catColor", label: "Tag Color", type: "color" },
       { k: "title", label: "Title", type: "text" },
       { k: "published", label: "Publish on the website", type: "checkbox", onLabel: "Published", offLabel: "Draft" },
+      { k: "slug", label: "URL slug — the page address after /blog/ (blank = made from the title)", type: "text" },
+      { k: "resource_type", label: "Show under (Resources and Insights menu)", type: "select", options: [
+        { value: "article", label: "Articles and insights" },
+        { value: "guide", label: "Guides and checklists — guide" },
+        { value: "checklist", label: "Guides and checklists — checklist" },
+      ] },
       { k: "excerpt", label: "Excerpt", type: "textarea" },
       { k: "content", label: "Article body", type: "richtext" },
       { k: "author", label: "Author", type: "text" },
@@ -166,11 +173,21 @@ const Field = ({ f, value, onChange, testId }) => {
       </div>
     );
   }
+  if (f.type === "select") {
+    return (
+      <div>
+        <label className="block text-[12px] font-semibold text-slatesage mb-1">{f.label}</label>
+        <select value={value || f.options[0].value} onChange={(e) => onChange(e.target.value)} className="w-full border border-powder bg-white px-3 py-2 text-[14px] focus:outline-none focus:border-navy" data-testid={testId} aria-label={f.label}>
+          {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+    );
+  }
   if (f.type === "richtext") {
     return (
       <div>
         <label className="block text-[12px] font-semibold text-slatesage mb-1">{f.label}</label>
-        <MarkdownEditor value={value} onChange={onChange} testId={testId} />
+        <RichTextEditor value={value} onChange={onChange} testId={testId} />
       </div>
     );
   }
@@ -197,19 +214,38 @@ const CollectionEditor = ({ name }) => {
 
   const setField = (idx, k, v) => setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, [k]: v } : it)));
   const addNew = () => setItems((arr) => [{ _new: true, ...(name === "blogs" ? { published: false } : {}) }, ...arr]);
-  const save = async (idx) => {
-    const it = items[idx];
+  // Fields starting with "_" are editor-only state (e.g. the Word import summary) and are never saved.
+  const forSave = (it) => Object.fromEntries(Object.entries(it).filter(([k]) => !k.startsWith("_") && k !== "id"));
+  const save = async (idx, overrides = {}) => {
+    const it = { ...items[idx], ...overrides };
     try {
       if (it._new || !it.id) {
-        const { _new, ...body } = it;
-        await api.post(`/content/${name}`, body);
+        await api.post(`/content/${name}`, forSave(it));
         setItems((arr) => arr.filter((_, i) => i !== idx));
       } else {
-        const { id, _new, ...body } = it;
-        await api.put(`/content/${name}/${it.id}`, body);
+        await api.put(`/content/${name}/${it.id}`, forSave(it));
       }
       await load();
     } catch (err) { alert(errMsg(err)); }
+  };
+
+  // Blogs: read a Word (.docx) article and open it as a ready-to-review draft.
+  const wordInput = useRef(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const importWord = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true); setImportError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/import/docx", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setItems((arr) => [{ _new: true, ...data.post, _import: { file: file.name, notes: data.notes || [], stats: data.stats || {} } }, ...arr]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) { setImportError(errMsg(err)); }
+    finally { setImporting(false); }
   };
   const remove = async (idx) => {
     const it = items[idx];
@@ -222,13 +258,54 @@ const CollectionEditor = ({ name }) => {
     <div data-testid={`editor-${name}`}>
       <div className="flex items-center justify-between mb-5">
         <h2 className="font-serif text-[26px] text-midnight font-semibold">{schema.label}</h2>
-        <button onClick={addNew} className="btn-amber" data-testid={`add-${name}`}>
-          <span className="btn-arrow"><Plus size={14} /></span><span>Add New</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {name === "blogs" && (
+            <>
+              <button onClick={() => wordInput.current?.click()} disabled={importing} className="btn-outline" data-testid="import-word-blogs">
+                <span className="btn-arrow"><FileText size={14} /></span><span>{importing ? "Reading Word file…" : "Import from Word"}</span>
+              </button>
+              <input ref={wordInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={importWord} data-testid="import-word-input" />
+            </>
+          )}
+          <button onClick={addNew} className="btn-amber" data-testid={`add-${name}`}>
+            <span className="btn-arrow"><Plus size={14} /></span><span>Add New</span>
+          </button>
+        </div>
       </div>
+      {name === "blogs" && (
+        <p className="text-slatesage text-[13px] -mt-2 mb-5" data-testid="import-word-help">
+          To post an article, click <strong>Import from Word</strong> and choose the .docx file — the title, headings, links, lists and images are filled in for you
+          (plus the SEO title, description and URL when the document includes a publishing brief). Or click <strong>Add New</strong> and paste the text into the article body.
+          Check it, then click <strong>Save &amp; Publish</strong>.
+        </p>
+      )}
+      {importError && <p className="mb-5 border border-red-200 bg-red-50 text-red-700 text-[13.5px] px-4 py-3" data-testid="import-word-error">{importError}</p>}
       <div className="space-y-5">
         {items.map((it, idx) => (
           <div key={it.id || idx} className="bg-white border border-powder p-5" data-testid={`item-${name}-${idx}`}>
+            {it._import && (
+              <div className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-900" data-testid={`import-summary-${idx}`}>
+                <p className="font-semibold flex items-center gap-2"><CheckCircle2 size={15} />Imported from {it._import.file} — not saved yet</p>
+                <p className="mt-1">
+                  {[
+                    it._import.stats.words != null && `${Number(it._import.stats.words).toLocaleString()} words`,
+                    it._import.stats.headings != null && `${it._import.stats.headings} headings`,
+                    it._import.stats.links != null && `${it._import.stats.links} links`,
+                    it._import.stats.images ? `${it._import.stats.images} images` : null,
+                  ].filter(Boolean).join(" · ")}
+                </p>
+                {it._import.notes.length > 0 && <ul className="list-disc pl-5 mt-2 space-y-1">{it._import.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+                <p className="mt-2">Add a category and a cover image if you want them, check the article body below (you can edit it like a Word document), then <strong>Save &amp; Publish</strong>.</p>
+              </div>
+            )}
+            {name === "blogs" && (it.title || it.slug) && (
+              <p className="mb-4 text-[12.5px] text-slatesage break-all" data-testid={`blog-url-${idx}`}>
+                Page address: <span className="font-mono text-midnight">{blogPath(it)}</span>
+                {it.id && it.published !== false && (
+                  <a href={blogPath(it)} target="_blank" rel="noopener noreferrer" className="ml-3 inline-flex items-center gap-1 text-navy underline">View page<ExternalLink size={12} /></a>
+                )}
+              </p>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               {schema.fields.map((f) => (
                 <div key={f.k} className={f.type === "textarea" || f.type === "image" || f.type === "list" || f.type === "pdf" || f.type === "richtext" ? "sm:col-span-2" : ""}>
@@ -238,8 +315,13 @@ const CollectionEditor = ({ name }) => {
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => save(idx)} className="btn-amber" data-testid={`save-${name}-${idx}`}>
-                <span className="btn-arrow"><Save size={14} /></span><span>Save</span>
+                <span className="btn-arrow"><Save size={14} /></span><span>{name === "blogs" && it.published === false ? "Save as Draft" : "Save"}</span>
               </button>
+              {name === "blogs" && it.published === false && (
+                <button onClick={() => save(idx, { published: true })} className="btn-amber" data-testid={`publish-${name}-${idx}`}>
+                  <span className="btn-arrow"><Send size={14} /></span><span>Save &amp; Publish</span>
+                </button>
+              )}
               <button onClick={() => remove(idx)} className="btn-outline" data-testid={`delete-${name}-${idx}`}>
                 <span className="btn-arrow"><Trash2 size={14} /></span><span>Delete</span>
               </button>

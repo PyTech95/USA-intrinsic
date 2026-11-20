@@ -1,9 +1,19 @@
 """Request-time render orchestrator for public pages (used by /api/ssr)."""
 from __future__ import annotations
 import re
-from ssr import (ROUTES, INTRO, FAQS, REDIRECTS, OLD_JOB_PATHS, ORG, PREFERRED_BASE,
+from ssr import (ROUTES, INTRO, FAQS, REDIRECTS, REDIRECT_PREFIXES, OLD_JOB_PATHS, ORG, PREFERRED_BASE,
                  esc, titlecase, normalize, breadcrumb_ld, faq_ld, _ld,
                  _nav_and_contact, _faq_html, _crumbs_html)
+import md_html
+
+# Service pages that link to a published article (rendered only while that article is published).
+_PARTNER = ("choosing-it-services-partner", "Choosing an IT services partner")
+_CYBER = ("cybersecurity-managed-it", "Cybersecurity as part of effective IT management")
+RELATED_ARTICLES = {
+    "/services/managed-it": [_PARTNER, _CYBER],
+    "/services/co-managed-it": [_PARTNER, _CYBER],
+    "/services/cybersecurity": [_CYBER],
+}
 
 
 def _slug(s: str) -> str:
@@ -11,15 +21,22 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 
+def _blog_slug(post: dict) -> str:
+    """Canonical article slug: the custom slug if set, else derived from the title."""
+    return _slug(post.get("slug") or "") or _slug(post.get("title", ""))
+
+
 def _paras(text) -> list:
     return [p for p in re.split(r"\n+", str(text or "")) if p.strip()]
 
 
 def _meta_head(template: str, *, title: str, description: str, canonical: str,
-               robots: str, og_image: str, og_type: str, extra_ld: list) -> str:
+               robots: str, og_image: str, og_type: str, extra_ld: list, keywords: str = "") -> str:
     html = template
     html = re.sub(r"<title>[\s\S]*?</title>", f"<title>{esc(title)}</title>", html, count=1)
     html = re.sub(r'<meta name="description"[^>]*>', f'<meta name="description" content="{esc(description)}" />', html, count=1)
+    if keywords:
+        html = re.sub(r'<meta name="keywords"[^>]*>', f'<meta name="keywords" content="{esc(keywords)}" />', html, count=1)
     html = re.sub(r'<meta property="og:title"[^>]*>', f'<meta property="og:title" content="{esc(title)}" />', html, count=1)
     html = re.sub(r'<meta property="og:description"[^>]*>', f'<meta property="og:description" content="{esc(description)}" />', html, count=1)
     html = re.sub(r'<meta property="og:url"[^>]*>', f'<meta property="og:url" content="{esc(canonical)}" />', html, count=1)
@@ -49,28 +66,41 @@ async def render(path: str, host: str, db, seo: dict, template: str) -> dict:
     if host and host.lower().startswith("www."):
         return {"status": 301, "location": base + (path if path.startswith("/") else "/" + path)}
 
-    # 2) legacy redirects
-    if p in REDIRECTS:
-        return {"status": 301, "location": base + REDIRECTS[p]}
+    # 2) legacy redirects. Old addresses were not case-sensitive (/Home), so match in lower case.
+    legacy = p.lower()
+    if legacy in REDIRECTS:
+        return {"status": 301, "location": base + REDIRECTS[legacy]}
+    for prefix, target in REDIRECT_PREFIXES.items():
+        if legacy.startswith(prefix):
+            return {"status": 301, "location": base + target}
 
-    # 3) old individual job URLs -> careers if a matching active job exists, else 410
+    # 3) old individual job URLs -> the same role under Careers if it is open, else Careers.
+    #    The old job feed is the one exception: it is gone, not moved.
     if p.startswith("/jobs/"):
         slug = p.split("/jobs/", 1)[1]
+        if slug == "feed":
+            return {"status": 410, "html": _error_html(template, 410, base), "content_type": "text/html; charset=utf-8"}
         job = await db.jobs.find_one({"slug": slug, "published": {"$ne": False}})
-        if job:
-            return {"status": 301, "location": base + f"/careers/{slug}"}
-        return {"status": 410, "html": _error_html(template, 410, base), "content_type": "text/html; charset=utf-8"}
+        return {"status": 301, "location": base + (f"/careers/{slug}" if job else "/careers")}
 
-    og_default = f"{base}/api/og/page.png?title={_q(ROUTES.get(p, {}).get('title', ORG['name']))}&label=Intrinsic%20Technology"
+    # 3b) one address per page: /careers/ is the same page as /careers, so send the
+    #     trailing-slash form to the plain one (Search Console listed /careers/ as a duplicate).
+    raw = (path or "/").split("#")[0]
+    raw_path, _, query = raw.partition("?")
+    if len(raw_path) > 1 and raw_path.endswith("/"):
+        return {"status": 301, "location": base + p + (f"?{query}" if query else "")}
+
+    og_title = ((seo.get("pages") or {}).get(p) or {}).get("title") or ROUTES.get(p, {}).get("title", ORG["name"])
+    og_default = f"{base}/api/og/page.png?title={_q(og_title)}&label=Intrinsic%20Technology"
 
     # 4) known static routes
     r = ROUTES.get(p)
     if r:
-        meta = {"title": _full_title(r, seo), "description": r["description"], "canonical": base + p,
-                "robots": "index, follow", "og_image": og_default, "og_type": "website"}
+        meta = page_meta(p, r, seo, base, og_default)
         inner, extra_ld = await _static_body(p, r, base, db, seo)
         html = _meta_head(template, title=meta["title"], description=meta["description"], canonical=meta["canonical"],
-                          robots=meta["robots"], og_image=meta["og_image"], og_type=meta["og_type"], extra_ld=extra_ld)
+                          robots=meta["robots"], og_image=meta["og_image"], og_type=meta["og_type"], extra_ld=extra_ld,
+                          keywords=meta["keywords"])
         return {"status": 200, "html": _inject_body(html, inner), "content_type": "text/html; charset=utf-8"}
 
     # 5) dynamic case studies
@@ -83,9 +113,12 @@ async def render(path: str, host: str, db, seo: dict, template: str) -> dict:
     # 6) dynamic blog posts (published only)
     if p.startswith("/blog/"):
         slug = p.split("/blog/", 1)[1]
-        post = await _find_by_slug(db.blogs, slug, published_only=True)
+        post = await _find_blog(db, slug)
         if post:
-            return _dynamic_page(template, base, p, _blog_view(post, base))
+            canonical = f"/blog/{_blog_slug(post)}"
+            if p != canonical:
+                return {"status": 301, "location": base + canonical}
+            return _dynamic_page(template, base, p, _blog_view(post, base), crumbs_ld=_article_crumbs_ld(post, base))
 
     # 7) dynamic job detail
     if p.startswith("/careers/") and p != "/careers":
@@ -104,11 +137,42 @@ def _q(s: str) -> str:
     return quote(str(s or "")[:120])
 
 
-def _full_title(r: dict, seo: dict) -> str:
-    if r.get("kind") == "home":
-        return "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
+def _full_title(r: dict, seo: dict, override: dict = None) -> str:
+    override = override or {}
     tmpl = seo.get("title_template") or "{title} | Intrinsic Technology"
-    return tmpl.replace("{title}", r["title"])
+    custom = (override.get("title") or "").strip()
+    if r.get("kind") == "home":
+        if custom:
+            return tmpl.replace("{title}", custom)
+        return (seo.get("default_title") or "").strip() or "Intrinsic Technology | Managed IT, Cybersecurity & Cloud Services"
+    if not custom and r.get("seo_title"):
+        return r["seo_title"]          # a full title tag that already carries the brand: used as written
+    return tmpl.replace("{title}", custom or r["title"])
+
+
+def page_meta(p: str, r: dict, seo: dict, base: str, og_default: str) -> dict:
+    """Head tags for a standard page. What the admin enters under SEO & GEO > Per-page overrides
+    (seo["pages"][path]) wins over the built-in defaults, exactly as it does in the browser
+    (frontend/src/lib/SeoContext.jsx) — so crawlers reading the page source see the same title
+    and description that visitors' browsers show."""
+    ov = (seo.get("pages") or {}).get(p) or {}
+    text = lambda key: (ov.get(key) or "").strip()
+    if r.get("kind") == "home":
+        description = text("description") or (seo.get("default_description") or "").strip() or r["description"]
+    else:
+        description = text("description") or r["description"]
+    og_image = text("og_image")
+    if og_image and not og_image.startswith("http"):
+        og_image = base + (og_image if og_image.startswith("/") else f"/api/files/{og_image}")
+    return {
+        "title": _full_title(r, seo, ov),
+        "description": description,
+        "keywords": text("keywords") or (seo.get("default_keywords") or "").strip(),
+        "canonical": base + p,
+        "robots": text("robots") or (seo.get("robots_default") or "").strip() or "index, follow",
+        "og_image": og_image or og_default,
+        "og_type": "website",
+    }
 
 
 async def _find_by_slug(coll, slug, include_prev=False, published_only=False):
@@ -119,6 +183,13 @@ async def _find_by_slug(coll, slug, include_prev=False, published_only=False):
         if include_prev and any(_slug(t) == slug for t in (doc.get("previous_titles") or [])):
             return doc
     return None
+
+
+async def _find_blog(db, slug):
+    """Published article by custom slug first, then by title slug or id."""
+    posts = [doc async for doc in db.blogs.find({"published": True}, {"_id": 0})]
+    return (next((d for d in posts if _blog_slug(d) == slug), None)
+            or next((d for d in posts if _slug(d.get("title", "")) == slug or d.get("id") == slug), None))
 
 
 async def _static_body(p: str, r: dict, base: str, db, seo: dict):
@@ -154,6 +225,29 @@ async def _static_body(p: str, r: dict, base: str, db, seo: dict):
             extra_ld.append({"@context": "https://schema.org", "@type": "Service", "name": r["title"],
                              "description": r["description"], "serviceType": r["title"],
                              "provider": {"@id": base + "/#organization"}, "areaServed": "US", "url": base + p})
+        if kind == "resources":
+            articles, guides = [], []
+            async for b in db.blogs.find({"published": True}, {"_id": 0}).sort("order", 1):
+                item = f'<li><a href="/blog/{esc(_blog_slug(b))}">{esc(b.get("title"))}</a>{(" — " + esc(b["excerpt"][:160])) if b.get("excerpt") else ""}</li>'
+                (guides if str(b.get("resource_type") or "").lower() in ("guide", "checklist") else articles).append(item)
+            cases = []
+            async for c in db.case_studies.find({}, {"_id": 0, "title": 1, "summary": 1, "stat": 1}).sort("order", 1):
+                cases.append(f'<li><a href="/case-studies/{_slug(c.get("title", ""))}">{esc(c.get("title"))}</a>{(" — " + esc((c.get("summary") or c.get("stat") or "")[:160])) if (c.get("summary") or c.get("stat")) else ""}</li>')
+            briefs = []
+            async for s in db.service_briefs.find({"available": {"$ne": False}}, {"_id": 0, "title": 1, "summary": 1, "subtitle": 1}).sort("order", 1):
+                if s.get("title"):
+                    briefs.append(f'<li>{esc(s["title"])}{(" — " + esc((s.get("summary") or s.get("subtitle") or "")[:160])) if (s.get("summary") or s.get("subtitle")) else ""}</li>')
+            for anchor, heading, items in (("articles", "Articles and insights", articles), ("case-studies", "Case studies", cases),
+                                           ("service-briefs", "Service briefs", briefs), ("guides", "Guides and checklists", guides)):
+                if items:
+                    parts.append(f'<section id="{anchor}" aria-label="{heading}"><h2>{heading}</h2><ul>{"".join(items)}</ul></section>')
+        links = []
+        for slug, label in RELATED_ARTICLES.get(p, []):
+            post = await _find_blog(db, slug)
+            if post:
+                links.append(f'<a href="/blog/{esc(_blog_slug(post))}">{esc(label)}</a>')
+        if links:
+            parts.append(f'<p>Related reading: {" · ".join(links)}</p>')
         if kind == "careers":
             jobs = []
             async for j in db.jobs.find({"published": {"$ne": False}}, {"_id": 0}):
@@ -165,11 +259,11 @@ async def _static_body(p: str, r: dict, base: str, db, seo: dict):
     return "\n".join(x for x in parts if x), extra_ld
 
 
-def _dynamic_page(template, base, p, view):
+def _dynamic_page(template, base, p, view, crumbs_ld=None):
     title, description, body, ld, og_image = view
     html = _meta_head(template, title=title, description=description, canonical=base + p,
                       robots="index, follow", og_image=og_image or f"{base}/api/og/page.png?title={_q(title)}",
-                      og_type="article", extra_ld=[breadcrumb_ld(p, base)] + ld)
+                      og_type="article", extra_ld=[crumbs_ld or breadcrumb_ld(p, base)] + ld)
     return {"status": 200, "html": _inject_body(html, body), "content_type": "text/html; charset=utf-8"}
 
 
@@ -199,22 +293,37 @@ def _case_study_view(cs, base):
     return title, desc, "\n".join(sec), ld, og
 
 
+def _article_trail(post):
+    """Articles sit under Resources and Insights: Home / Resources and Insights / <title>."""
+    return [("/", "Home"), ("/resources", ROUTES["/resources"]["label"]), (f"/blog/{_blog_slug(post)}", post.get("title") or "Article")]
+
+
+def _article_crumbs_ld(post, base):
+    return {"@context": "https://schema.org", "@type": "BreadcrumbList",
+            "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": name, "item": base + path}
+                                for i, (path, name) in enumerate(_article_trail(post))]}
+
+
 def _blog_view(post, base):
-    slug = _slug(post.get("title", ""))
-    title = (post.get("seo_title") or post.get("title")) + " | Intrinsic Technology"
-    desc = (post.get("seo_description") or post.get("geo_summary") or post.get("excerpt") or str(post.get("content") or "")[:180])[:300]
+    slug = _blog_slug(post)
+    title = post.get("seo_title") or post.get("title") or ""
+    if "|" not in title:                      # an SEO title that already carries the brand is used as written
+        title += " | Intrinsic Technology"
+    desc = (post.get("seo_description") or post.get("geo_summary") or post.get("excerpt") or md_html.to_text(post.get("content"))[:180])[:300]
     og = post.get("og_image") or f"{base}/api/og/blogs/{slug}.png"
-    sec = [_crumbs_html(f"/blog/{slug}"), f"<h1>{esc(post.get('title'))}</h1>"]
+    crumbs = " / ".join(f'<a href="{path}">{esc(name)}</a>' for path, name in _article_trail(post))
+    sec = [f'<nav aria-label="Breadcrumb">{crumbs}</nav>', f"<h1>{esc(post.get('title'))}</h1>"]
     if post.get("author"):
         sec.append(f'<p>By {esc(post["author"])}{(" · " + esc(post.get("date"))) if post.get("date") else ""}</p>')
     if post.get("excerpt"):
         sec.append(f"<p>{esc(post['excerpt'])}</p>")
-    for para in _paras(post.get("content")):
-        sec.append(f"<p>{esc(para)}</p>")
+    if post.get("content"):                   # Markdown body -> real headings, lists and crawlable links
+        sec.append(f"<article>{md_html.to_html(post['content'])}</article>")
     sec.append(_nav_and_contact(base))
-    ld = [{"@context": "https://schema.org", "@type": "BlogPosting", "headline": post.get("seo_title") or post.get("title"),
-           "description": desc, "image": og, "datePublished": post.get("date") or post.get("created_at") or None,
-           "author": {"@type": "Person", "name": post.get("author") or ORG["name"]},
+    author = post.get("author") or ORG["name"]
+    ld = [{"@context": "https://schema.org", "@type": "BlogPosting", "headline": post.get("title") or post.get("seo_title"),
+           "description": desc, "image": og, "datePublished": post.get("created_at") or post.get("date") or None,
+           "author": {"@type": "Organization" if "intrinsic" in author.lower() else "Person", "name": author},
            "publisher": {"@type": "Organization", "name": ORG["name"]}, "articleSection": post.get("category") or None,
            "mainEntityOfPage": base + f"/blog/{slug}"}]
     return title, desc, "\n".join(sec), ld, og

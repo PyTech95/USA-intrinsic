@@ -7,7 +7,7 @@ const STATIC = [
   { label: "Home", to: "/", group: "Pages" },
   { label: "About Us", to: "/about", group: "Pages" },
   { label: "Careers", to: "/careers", group: "Pages" },
-  { label: "Resources", to: "/resources", group: "Pages" },
+  { label: "Resources and Insights", to: "/resources", group: "Pages" },
   { label: "Contact", to: "/contact", group: "Pages" },
 ];
 
@@ -21,7 +21,10 @@ function buildIndex() {
   };
   nav.forEach((n) => {
     if (n.to) add(n.label, n.to, n.items.length ? n.label : "Services");
-    n.items.forEach((it) => add(it.label, it.to, n.label));
+    n.items.forEach((it) => {
+      add(it.label, it.to, n.label);
+      (it.children || []).forEach((c) => add(c.label, c.to, it.label));   // sub-links, e.g. Resources and Insights > Case studies
+    });
   });
   STATIC.forEach((s) => add(s.label, s.to, s.group));
   return out;

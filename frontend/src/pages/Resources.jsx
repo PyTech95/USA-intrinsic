@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { ScrollProgress, Reveal } from "../components/common";
 import { ArrowRight, ArrowUpRight, Mic, Search } from "lucide-react";
 import { api, imgUrl } from "../lib/api";
-import { slugify } from "../lib/slug";
+import { slugify, blogPath, isGuide } from "../lib/slug";
 
 const ts = (v) => {
   if (!v) return 0;
@@ -56,7 +56,16 @@ const ResourceCard = ({ item, i }) => {
   return <div className={cls} data-testid={`resource-item-${i}`}>{inner}</div>;
 };
 
-const TYPES = ["All", "Case Studies", "Service Briefs", "Articles"];
+// Order matches the "Resources and Insights" menu. "hash" is the deep link used by the menu
+// (e.g. /resources#articles) and by links elsewhere on the site.
+const TYPE_DEFS = [
+  { key: "All", hash: "" },
+  { key: "Articles and insights", hash: "articles" },
+  { key: "Case studies", hash: "case-studies" },
+  { key: "Service briefs", hash: "service-briefs" },
+  { key: "Guides and checklists", hash: "guides" },
+];
+const TYPES = TYPE_DEFS.map((t) => t.key);
 
 const Resources = () => {
   const [posts, setPosts] = useState([]);
@@ -68,6 +77,16 @@ const Resources = () => {
   const [listening, setListening] = useState(false);
   const [voiceMsg, setVoiceMsg] = useState("");
   const recRef = useRef(null);
+  const { hash, key: locationKey } = useLocation();
+
+  // Menu links such as /resources#articles pre-select the matching list.
+  // (Scrolling to the list is handled globally via the anchor targets rendered below.)
+  useEffect(() => {
+    const h = (hash || "").replace(/^#/, "").toLowerCase();
+    const match = TYPE_DEFS.find((t) => t.hash && t.hash === h);
+    if (match) setType(match.key);
+    else if (!h) setType("All");
+  }, [hash, locationKey]);
 
   useEffect(() => {
     api.get("/content/blogs").then(({ data }) => setPosts(data || [])).catch(() => {});
@@ -104,7 +123,7 @@ const Resources = () => {
 
   const items = useMemo(() => {
     const cs = gridCases.map((c, i) => ({
-      type: "Case Studies", kind: "Case Study",
+      type: "Case studies", kind: "Case Study",
       tag: c.tag, title: c.card_title || c.stat || c.title, desc: c.summary || c.body,
       image: c.image, tint: c.heroBg || "#eef2f8", fit: "object-contain", pos: "",
       to: `/case-studies/${slugify(c.title)}`, action: "Read the Case Study",
@@ -113,19 +132,24 @@ const Resources = () => {
     const sb = briefs
       .filter((b) => b.available !== false && b.has_file && b.title)
       .map((b) => ({
-        type: "Service Briefs", kind: "Service Brief",
+        type: "Service briefs", kind: "Service Brief",
         tag: b.service, title: b.title, desc: b.summary || b.subtitle,
         image: b.cover || null, tint: "#e9edf3", fit: "object-cover", pos: "object-top",
         to: `/contact?brief=${encodeURIComponent(b.id)}#contact-form-section`, action: "Request the Brief", meta: b.pages || null,
         order: 1, date: ts(b.created_at),
       }));
-    const bl = posts.map((p) => ({
-      type: "Articles", kind: "Article",
-      tag: p.category, title: p.title, desc: p.excerpt,
-      image: p.image || null, tint: p.catColor || "#eef2f8", fit: "object-cover", pos: "",
-      to: p.to || `/blog/${slugify(p.title)}`, action: "Read Article", meta: p.read || p.date,
-      order: 2, date: ts(p.date),
-    }));
+    const bl = posts.map((p) => {
+      const guide = isGuide(p);
+      const checklist = String(p.resource_type || "").toLowerCase() === "checklist";
+      return {
+        type: guide ? "Guides and checklists" : "Articles and insights",
+        kind: checklist ? "Checklist" : guide ? "Guide" : "Article",
+        tag: p.category, title: p.title, desc: p.excerpt,
+        image: p.image || null, tint: p.catColor || "#eef2f8", fit: "object-cover", pos: "",
+        to: p.to || blogPath(p), action: checklist ? "View Checklist" : guide ? "Read Guide" : "Read Article", meta: p.read || p.date,
+        order: guide ? 3 : 2, date: ts(p.date) || ts(p.created_at),
+      };
+    });
     return [...cs, ...sb, ...bl];
   }, [gridCases, briefs, posts]);
 
@@ -151,7 +175,7 @@ const Resources = () => {
         {/* Hero */}
         <section className="relative overflow-hidden pt-[var(--nav-h)]" style={{ background: "#00388e" }} data-testid="resources-hero">
           <div className="relative z-10 mx-auto w-full max-w-[1000px] px-6 lg:px-10 pt-16 lg:pt-20 pb-16 lg:pb-20" data-testid="resources-hero-content">
-            <p className="mb-5 font-sans font-bold uppercase" style={{ fontSize: "15px", letterSpacing: "0.22em", color: "#ffffff" }}>Resource Center</p>
+            <p className="mb-5 font-sans font-bold uppercase" style={{ fontSize: "15px", letterSpacing: "0.22em", color: "#ffffff" }}>Resources and Insights</p>
             <h1 data-testid="resources-hero-title" className="font-serif font-semibold text-white text-[42px] sm:text-[56px] leading-[1.04]">Case studies, service briefs, and practical insights.</h1>
             <p className="text-white text-[17px] leading-relaxed mt-6 max-w-[640px]">
               Everything in one place — read what we delivered for organizations like yours, download a two-page brief
@@ -185,7 +209,11 @@ const Resources = () => {
         </section>
 
         {/* All resources */}
-        <section id="all-resources" className="pt-14 lg:pt-20 pb-16 lg:pb-24 scroll-mt-[var(--nav-h)]" data-testid="resources-all">
+        <section id="all-resources" className="relative pt-14 lg:pt-20 pb-16 lg:pb-24 scroll-mt-[var(--nav-h)]" data-testid="resources-all">
+          {/* Anchor targets so /resources#articles, #case-studies, #service-briefs and #guides land on the list */}
+          {TYPE_DEFS.filter((t) => t.hash).map((t) => (
+            <span key={t.hash} id={t.hash} aria-hidden="true" className="absolute top-0 left-0 h-0 w-0 scroll-mt-[var(--nav-h)]" />
+          ))}
           <div className="mx-auto w-full max-w-[1000px] px-6 lg:px-10">
             <h2 className="font-serif font-semibold text-[26px] sm:text-[32px] text-royal mb-8">All Resources</h2>
 
@@ -220,7 +248,11 @@ const Resources = () => {
                 </Reveal>
               ))}
             </div>
-            {filtered.length === 0 && <p className="text-slatesage mt-8" data-testid="resources-empty">No resources match your search.</p>}
+            {filtered.length === 0 && (
+              <p className="text-slatesage mt-8" data-testid="resources-empty">
+                {q.trim() || type === "All" ? "No resources match your search." : `${type} are coming soon.`}
+              </p>
+            )}
           </div>
         </section>
 

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { ScrollProgress, Reveal } from "../components/common";
 import Markdown from "../components/Markdown";
 import { api, imgUrl, API } from "../lib/api";
-import { slugify } from "../lib/slug";
+import { slugify, blogSlug, blogPath, isGuide } from "../lib/slug";
 import { usePageSeo } from "../lib/SeoContext";
 
 export default function BlogPost() {
@@ -18,13 +18,23 @@ export default function BlogPost() {
   }, []);
 
   const all = list || [];
-  const post = all.find((p) => slugify(p.title) === slug || p.id === slug);
+  // The custom URL slug is canonical; the title-based slug and the id still resolve and redirect to it.
+  const post = all.find((p) => blogSlug(p) === slug) || all.find((p) => slugify(p.title) === slug || p.id === slug);
+  const canonicalSlug = post ? blogSlug(post) : "";
   const others = all.filter((p) => p !== post).slice(0, 3);
   const hero = post?.image ? imgUrl(post.image) : "";
-  const ogImage = post ? (post.og_image ? imgUrl(post.og_image) : `${API}/og/blogs/${slugify(post.title)}.png`) : "";
+  const ogImage = post ? (post.og_image ? imgUrl(post.og_image) : `${API}/og/blogs/${canonicalSlug}.png`) : "";
+  const guide = isGuide(post);
+  const listPath = guide ? "/resources#guides" : "/resources#articles";
+  const listLabel = guide ? "Guides and checklists" : "Articles and insights";
+  // An SEO title that already carries the brand (e.g. "… | Intrinsic") is used exactly as written.
+  const seoTitle = post ? (post.seo_title || post.title) : "";
+  const authorIsOrg = /intrinsic/i.test(post?.author || "") || !post?.author;
 
   usePageSeo(post ? {
-    title: post.seo_title || post.title,
+    title: seoTitle,
+    titleExact: seoTitle.includes("|"),
+    breadcrumb: [{ name: "Resources and Insights", path: "/resources" }, { name: post.title, path: blogPath(post) }],
     description: post.seo_description || post.geo_summary || post.excerpt || String(post.content || "").slice(0, 180),
     keywords: post.seo_keywords || post.category,
     image: ogImage,
@@ -32,14 +42,17 @@ export default function BlogPost() {
     jsonLd: [{
       "@context": "https://schema.org",
       "@type": "BlogPosting",
-      headline: post.seo_title || post.title,
+      headline: post.title,
       description: post.seo_description || post.geo_summary || post.excerpt,
       image: ogImage || undefined,
-      author: { "@type": "Person", name: post.author || "Intrinsic Technology" },
+      datePublished: post.created_at || undefined,
+      author: { "@type": authorIsOrg ? "Organization" : "Person", name: post.author || "Intrinsic Technology" },
       publisher: { "@type": "Organization", name: "Intrinsic Technology" },
       articleSection: post.category || undefined,
     }],
   } : null);
+
+  if (post && slug !== canonicalSlug) return <Navigate to={blogPath(post)} replace />;
 
   return (
     <div className="bg-white page-in" data-testid="blog-post-page">
@@ -49,14 +62,14 @@ export default function BlogPost() {
         {list && !post ? (
           <section className="container-x py-24 text-center" data-testid="blog-post-missing">
             <h1 className="font-serif font-semibold text-[32px] text-royal">This article is not published yet.</h1>
-            <Link to="/resources#articles" className="btn-amber mt-8 inline-flex"><span>Back to Resources</span><span className="btn-arrow"><ArrowRight size={14} /></span></Link>
+            <Link to="/resources#articles" className="btn-amber mt-8 inline-flex"><span>Back to Resources and Insights</span><span className="btn-arrow"><ArrowRight size={14} /></span></Link>
           </section>
         ) : post ? (
           <>
             <section className="no-hero-fill pt-6 lg:pt-10" data-testid="blog-post-header">
               <div className="mx-auto w-full max-w-[860px] px-6 lg:px-10">
                 <div className="flex flex-wrap items-center gap-2 text-[12px] font-sans">
-                  <Link to="/resources#articles" className="font-bold tracking-[0.14em] uppercase text-navy hover:text-royal transition-colors inline-flex items-center gap-1.5" data-testid="blog-post-back"><ArrowLeft size={13} />Articles</Link>
+                  <Link to={listPath} className="font-bold tracking-[0.14em] uppercase text-navy hover:text-royal transition-colors inline-flex items-center gap-1.5" data-testid="blog-post-back"><ArrowLeft size={13} />{listLabel}</Link>
                   {post.category && <span className="eyebrow text-[10px] px-2 py-1 text-midnight" style={{ backgroundColor: post.catColor || "#eef2f8" }} data-testid="blog-post-category">{post.category}</span>}
                 </div>
                 <Reveal>
@@ -97,7 +110,7 @@ export default function BlogPost() {
                   <p className="eyebrow text-[#c07f11] mb-8">More articles</p>
                   <div className="grid md:grid-cols-3 gap-6">
                     {others.map((o, i) => (
-                      <Link key={o.id} to={`/blog/${slugify(o.title)}`} className="group border border-powder/70 p-6 transition-all duration-300 hover:-translate-y-1.5 hover:border-navy/30" data-testid={`blog-post-more-${i}`}>
+                      <Link key={o.id} to={blogPath(o)} className="group border border-powder/70 p-6 transition-all duration-300 hover:-translate-y-1.5 hover:border-navy/30" data-testid={`blog-post-more-${i}`}>
                         {o.category && <p className="font-sans font-bold text-[12px] tracking-[0.1em] uppercase text-royal">{o.category}</p>}
                         <h3 className="font-serif text-[20px] text-midnight mt-3 leading-snug group-hover:text-navy transition-colors">{o.title}</h3>
                       </Link>

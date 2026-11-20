@@ -10,8 +10,9 @@ const AREAS = {
   "new-york": {
     slug: "new-york",
     title: "Managed IT Services in New York City",
+    seoTitle: "Managed IT Services NYC | On-site IT Support | Intrinsic",
     label: "New York IT Services",
-    description: "On-site and remote managed IT, cybersecurity, and cloud services for New York City businesses, from our 14 Wall Street headquarters.",
+    description: "Managed IT, cybersecurity and cloud support for New York City organizations, from our 14 Wall Street office. On-site and remote. Talk to our team.",
     office: "14 Wall Street, Suite 5C, New York, NY 10005",
     intro: [
       "Intrinsic Technology is headquartered at 14 Wall Street in Lower Manhattan and provides on-site and remote managed IT, cybersecurity, and cloud services across the five boroughs and the greater New York City metro.",
@@ -26,8 +27,9 @@ const AREAS = {
   "new-jersey": {
     slug: "new-jersey",
     title: "Managed IT Services in New Jersey",
+    seoTitle: "Managed IT Services in New Jersey | Intrinsic",
     label: "New Jersey IT Services",
-    description: "Managed IT, cybersecurity, and cloud services for New Jersey businesses, supported from our Paterson, NJ office.",
+    description: "Managed IT, cybersecurity and cloud support for northern New Jersey organizations, on site and remote, with 24/7 monitoring and a help desk.",
     office: "46–48 Camden Avenue, Paterson, NJ 07501",
     intro: [
       "From our office at 46–48 Camden Avenue in Paterson, Intrinsic Technology supports New Jersey businesses with managed IT, cybersecurity, and cloud services—on site where needed and remotely for day-to-day support.",
@@ -46,7 +48,10 @@ export default function ServiceAreaPage() {
   const area = AREAS[slug];
 
   usePageSeo(area ? {
-    title: area.title,
+    // seoTitle is the full title tag from On-page Fix Pack 1 (it already carries the brand), so it is
+    // used as written; the heading on the page stays area.title.
+    title: area.seoTitle || area.title,
+    titleExact: Boolean(area.seoTitle),
     description: area.description,
     jsonLd: [{
       "@context": "https://schema.org", "@type": "Service", name: area.title, description: area.description,

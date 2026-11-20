@@ -2,7 +2,7 @@
 export const SEO_ROUTES = [
   { path: "/", label: "Home", title: "Managed IT, Cybersecurity & Cloud Services", description: "Complete oversight of your technology environment—proactive monitoring, infrastructure management, and strategic guidance to keep operations secure and resilient." },
   { path: "/about", label: "About Us", title: "About Intrinsic Technology", description: "A women-owned and minority-owned managed service provider in New York City delivering accountable, coordinated technology services." },
-  { path: "/resources", label: "Resources", title: "Resources, Insights & Case Studies", description: "Practical insights, service briefs, and client case studies to help you make better technology decisions." },
+  { path: "/resources", label: "Resources and Insights", title: "Resources and Insights", description: "Practical insights, service briefs, and client case studies to help you make better technology decisions." },
   { path: "/careers", label: "Careers", title: "Careers at Intrinsic Technology", description: "Join a technology team focused on security, reliability, and real client outcomes." },
   { path: "/contact", label: "Contact", title: "Talk to an Expert", description: "Get in touch with Intrinsic Technology to discuss managed IT, cybersecurity, cloud, and AI services." },
   { path: "/privacy-policy", label: "Privacy Policy", title: "Privacy Policy", description: "How Intrinsic Technology collects, uses, and protects your information." },
@@ -34,6 +34,9 @@ export const SEO_ROUTES = [
   { path: "/industries/financial-services", label: "Financial Services", title: "IT for Financial Services", description: "Compliance-ready managed IT and security for financial services." },
   { path: "/industries/non-profit", label: "Non-Profit", title: "IT for Non-Profits", description: "Affordable, dependable technology for nonprofit organizations." },
   { path: "/industries/healthcare", label: "Healthcare", title: "IT for Healthcare", description: "HIPAA-aligned managed IT and security for healthcare providers." },
+  // Service-area pages (defaults mirror pages/ServiceAreaPage.jsx and backend/ssr.py) — listed here so they can be edited in the admin.
+  { path: "/service-areas/new-york", label: "New York IT Services", title: "Managed IT Services NYC | On-site IT Support", description: "Managed IT, cybersecurity and cloud support for New York City organizations, from our 14 Wall Street office. On-site and remote. Talk to our team." },
+  { path: "/service-areas/new-jersey", label: "New Jersey IT Services", title: "Managed IT Services in New Jersey", description: "Managed IT, cybersecurity and cloud support for northern New Jersey organizations, on site and remote, with 24/7 monitoring and a help desk." },
 ];
 
 export const SEO_ROUTE_MAP = SEO_ROUTES.reduce((m, r) => { m[r.path] = r; return m; }, {});
