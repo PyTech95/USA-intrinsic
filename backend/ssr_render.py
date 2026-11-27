@@ -259,6 +259,31 @@ async def _static_body(p: str, r: dict, base: str, db, seo: dict):
     return "\n".join(x for x in parts if x), extra_ld
 
 
+def fit_title(title: str, limit: int = 60) -> str:
+    """The full title tag for a page whose title the admin writes (case study, job): with the long
+    brand if it fits in `limit` characters, else the short brand, else the title alone."""
+    t = (title or "").strip()
+    for brand in (" | Intrinsic Technology", " | Intrinsic"):
+        if len(t + brand) <= limit:
+            return t + brand
+    return t
+
+
+def fit_description(text: str, limit: int = 155) -> str:
+    """At most `limit` characters: whole sentences if they fill enough of it, otherwise cut at
+    the last whole word with an ellipsis. Same rule as frontend/src/lib/seoText.js."""
+    t = re.sub(r"\s+", " ", text or "").strip()
+    if len(t) <= limit:
+        return t
+    head = t[:limit + 1]
+    stop = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+    if stop >= 90:
+        return head[:stop + 1]
+    cut = t[:limit - 1]
+    space = cut.rfind(" ")
+    return re.sub(r"[\s,;:.\-\u2013\u2014]+$", "", cut[:space] if space > 60 else cut) + "\u2026"
+
+
 def _dynamic_page(template, base, p, view, crumbs_ld=None):
     title, description, body, ld, og_image = view
     html = _meta_head(template, title=title, description=description, canonical=base + p,
@@ -269,8 +294,8 @@ def _dynamic_page(template, base, p, view, crumbs_ld=None):
 
 def _case_study_view(cs, base):
     slug = _slug(cs.get("title", ""))
-    title = (cs.get("seo_title") or cs.get("title")) + " | Intrinsic Technology"
-    desc = (cs.get("seo_description") or cs.get("geo_summary") or cs.get("summary") or str(cs.get("body") or "")[:180])[:300]
+    title = fit_title(cs.get("seo_title") or cs.get("title"))
+    desc = fit_description(cs.get("seo_description") or cs.get("geo_summary") or cs.get("summary") or str(cs.get("body") or ""))
     og = cs.get("og_image") or f"{base}/api/og/case-studies/{slug}.png"
     sec = [_crumbs_html(f"/case-studies/{slug}"), f"<h1>{esc(cs.get('title'))}</h1>"]
     if cs.get("stat"):
@@ -336,7 +361,7 @@ def _job_view(job, base):
     slug = job.get("slug")
     title = job.get("title") + " | Intrinsic Technology"
     descparts = [job.get("overview")] + list(job.get("responsibilities") or []) + list(job.get("requirements") or [])
-    desc = (job.get("overview") or f"Open role: {job.get('title')}")[:300]
+    desc = fit_description(job.get("overview") or f"Open role: {job.get('title')}")
     sec = [_crumbs_html(f"/careers/{slug}"), f"<h1>{esc(job.get('title'))}</h1>",
            f"<p><strong>{esc(job.get('type') or '')}</strong> · {esc(job.get('location') or '')} · {esc(job.get('category') or '')}</p>"]
     if job.get("overview"):

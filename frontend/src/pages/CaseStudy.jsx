@@ -7,6 +7,7 @@ import { ScrollProgress, Reveal } from "../components/common";
 import { api, imgUrl, API } from "../lib/api";
 import { slugify } from "../lib/slug";
 import { usePageSeo } from "../lib/SeoContext";
+import { fitTitle, fitDescription } from "../lib/seoText";
 
 const FALLBACK_ART = ["/images/cases/case-bi.webp", "/images/cases/case-crm.webp", "/images/cases/case-m365.webp"];
 
@@ -33,8 +34,9 @@ export default function CaseStudy() {
   const hero = cs?.image ? imgUrl(cs.image) : FALLBACK_ART[Math.max(all.indexOf(cs), 0) % 3];
 
   usePageSeo(cs ? {
-    title: cs.seo_title || cs.title,
-    description: cs.seo_description || cs.geo_summary || cs.summary || String(cs.body || "").slice(0, 180),
+    title: fitTitle(cs.seo_title || cs.title),
+    titleExact: true,
+    description: fitDescription(cs.seo_description || cs.geo_summary || cs.summary || cs.body),
     keywords: cs.seo_keywords || cs.tag,
     image: cs.og_image ? imgUrl(cs.og_image) : `${API}/og/case-studies/${slugify(cs.title)}.png`,
     type: "article",
