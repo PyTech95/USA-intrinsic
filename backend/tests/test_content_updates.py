@@ -42,7 +42,8 @@ class TestArticleUpdate:
             other = await db.blogs.find_one({"slug": "cybersecurity-managed-it"})
             return first, second, posts, other
         first, second, posts, second_article = run(go())
-        assert first == ["article-choosing-it-services-partner-v1", "article-cybersecurity-managed-it-v1"] and second == []
+        assert first == ["article-choosing-it-services-partner-v1", "article-cybersecurity-managed-it-v1",
+                         "article-choosing-it-services-partner-v2"] and second == []
         assert len(posts) == 1
         post = posts[0]
         assert post["published"] is True and post["order"] == 3
@@ -63,16 +64,48 @@ class TestArticleUpdate:
             return await db.blogs.count_documents({"slug": SLUG})
         assert run(go()) == 0
 
-    def test_existing_article_with_same_title_is_left_alone(self):
+    def test_published_article_with_same_title_is_left_alone(self):
         async def go():
             db = fresh_db()
-            await db.blogs.insert_one({"id": "x", "title": ARTICLE["title"], "content": "Admin's own version", "published": False, "order": 0})
+            await db.blogs.insert_one({"id": "x", "title": ARTICLE["title"], "content": "Admin's own version", "published": True, "order": 0})
             await content_updates.apply_content_updates(db)
-            return await db.blogs.find({}).to_list(10)
-        posts = run(go())
+            return await db.blogs.find({}).to_list(10), await db.content_backups.count_documents({})
+        posts, backups = run(go())
         partner = [p for p in posts if p["title"] == ARTICLE["title"]]
         assert len(partner) == 1 and partner[0]["content"] == "Admin's own version"     # not duplicated, not overwritten
-        assert len(posts) == 2                                                           # the other article is still added
+        assert len(posts) == 2 and backups == 0                                          # the other article is still added
+
+    def test_unpublished_draft_is_backed_up_replaced_and_published(self):
+        """What happened on the live site on 20 Nov 2026: the first update found a draft with this
+        title, skipped it, and the article never went live. The second update publishes it."""
+        async def go():
+            db = fresh_db()
+            # state of the live database before the fix: v1 recorded as applied, an unpublished draft in place
+            await db.content_updates.create_index("key", unique=True)
+            await db.content_updates.insert_many([{"key": "article-choosing-it-services-partner-v1", "inserted": False},
+                                                  {"key": "article-cybersecurity-managed-it-v1", "inserted": True}])
+            await db.blogs.insert_one({"id": "draft-9", "title": ARTICLE["title"], "content": "Half-finished draft", "published": False, "order": 4})
+            first = await content_updates.apply_content_updates(db)
+            second = await content_updates.apply_content_updates(db)
+            return first, second, await db.blogs.find({}).to_list(10), await db.content_backups.find({}).to_list(10)
+        first, second, posts, backups = run(go())
+        assert first == ["article-choosing-it-services-partner-v2"] and second == []
+        assert len(posts) == 1                                         # replaced in place, not duplicated
+        post = posts[0]
+        assert post["published"] is True and post["slug"] == SLUG and post["id"] == "draft-9" and post["order"] == 4
+        assert post["content"] == ARTICLE["content"] and post["seo_title"] == ARTICLE["seo_title"]
+        assert re.fullmatch(r"\d{2} [A-Z][a-z]{2} \d{4}", post["date"])
+        assert len(backups) == 1 and backups[0]["doc"]["content"] == "Half-finished draft"      # nothing is lost
+        assert backups[0]["update_key"] == "article-choosing-it-services-partner-v2"
+
+    def test_draft_unpublished_after_the_fix_stays_unpublished(self):
+        async def go():
+            db = fresh_db()
+            await content_updates.apply_content_updates(db)
+            await db.blogs.update_one({"slug": SLUG}, {"$set": {"published": False}})       # admin takes it down later
+            await content_updates.apply_content_updates(db)                                   # next restart
+            return await db.blogs.find_one({"slug": SLUG})
+        assert run(go())["published"] is False
 
     def test_the_six_links_from_the_publishing_brief_are_in_the_body(self):
         body = ARTICLE["content"]

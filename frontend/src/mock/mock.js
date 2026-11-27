@@ -17,8 +17,8 @@ export const nav = [
     { label: "Cloud Infrastructure & Migration", to: "/services/cloud-infrastructure-migration", desc: "Design, migrate, and manage Azure and hybrid." },
     { label: "Backup & Disaster Recovery", to: "/services/backup-disaster-recovery", desc: "Business continuity built around recovery." },
   ] },
-  { label: "Managed IT", to: "/services/managed-support", items: [
-    { label: "Managed IT Services", to: "/services/managed-it-services", desc: "A complete outsourced IT function." },
+  { label: "Managed IT", to: "/services/managed-it", items: [
+    { label: "Managed IT Services", to: "/services/managed-it", desc: "A complete outsourced IT function." },
     { label: "Co-Managed IT", to: "/services/co-managed-it", desc: "Additional capability for internal IT teams." },
     { label: "Remote Monitoring & Management", to: "/services/remote-monitoring-management", desc: "Continuous visibility across your infrastructure." },
     { label: "Networking", to: "/services/networking", desc: "Reliable, secure connectivity everywhere." },

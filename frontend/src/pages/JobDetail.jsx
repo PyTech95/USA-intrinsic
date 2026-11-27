@@ -6,6 +6,7 @@ import { ScrollProgress, Reveal } from "../components/common";
 import { ArrowLeft, ArrowRight, MapPin, Briefcase, Tag, CheckCircle2, Upload, Loader2, Check } from "lucide-react";
 import { BACKEND, errMsg, api } from "../lib/api";
 import { usePageSeo } from "../lib/SeoContext";
+import { fitDescription } from "../lib/seoText";
 import axios from "axios";
 
 const EMP_TYPE = { "full time": "FULL_TIME", "full-time": "FULL_TIME", "part time": "PART_TIME", "part-time": "PART_TIME", contract: "CONTRACTOR", contractor: "CONTRACTOR", internship: "INTERN", temporary: "TEMPORARY" };
@@ -62,7 +63,7 @@ const JobDetail = () => {
 
   usePageSeo(job ? {
     title: job.title,
-    description: (job.overview || `Open role at Intrinsic Technology: ${job.title}. ${job.type || ""} ${job.location || ""}`).slice(0, 180),
+    description: fitDescription(job.overview || `Open role at Intrinsic Technology: ${job.title}. ${job.type || ""} ${job.location || ""}`),
     keywords: `${job.title}, ${job.category || "careers"}, Intrinsic Technology jobs`,
     type: "article",
     jsonLd: [jobPostingLd(job)],

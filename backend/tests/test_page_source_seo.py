@@ -106,3 +106,27 @@ class TestNewYorkAndNewJersey:
     def test_the_heading_on_the_page_is_unchanged(self):
         assert "Managed IT Services in New York City" in render("/service-areas/new-york", seo())
         assert "Managed IT Services in New Jersey" in render("/service-areas/new-jersey", seo())
+
+
+class TestTitlesAndDescriptionsFromAdminContent:
+    """Case-study and job pages build their title and description from text the admin writes."""
+
+    def test_title_gets_the_longest_brand_that_fits_in_60_characters(self):
+        assert ssr_render.fit_title("Cloud Solutions Engineer") == "Cloud Solutions Engineer | Intrinsic Technology"
+        t = "Strengthening Endpoint Security and Patch Compliance"                       # 52 characters
+        assert ssr_render.fit_title(t) == t                                              # no brand fits
+        assert ssr_render.fit_title("Improving CRM Adoption With Salesforce Sales Cloud") == "Improving CRM Adoption With Salesforce Sales Cloud"
+        assert ssr_render.fit_title("A Title of Exactly Forty-Seven Characters Here!") == "A Title of Exactly Forty-Seven Characters Here! | Intrinsic"
+        for title in ("Short", "Consolidating Microsoft 365 Domains and SharePoint Without Downtime"):
+            assert ssr_render.fit_title(title).startswith(title)                         # the title itself is never cut
+
+    def test_description_is_at_most_155_characters_and_ends_cleanly(self):
+        short = "A law firm strengthened endpoint security."
+        assert ssr_render.fit_description(short) == short
+        two = ("Four email domains and 50+ SharePoint sites were consolidated into a single Microsoft 365 identity with no reported downtime. "
+               "Permissions and version history were preserved throughout the migration, and staff kept working.")
+        assert ssr_render.fit_description(two) == two.split(". ")[0] + "."              # whole first sentence
+        long_one = "A precast concrete manufacturer modernized its production management system on Microsoft Azure while retaining Microsoft Access, achieving 99.9% availability and monthly reporting in hours"
+        out = ssr_render.fit_description(long_one)
+        assert len(out) <= 155 and out.endswith("\u2026") and not out[:-1].endswith(" ")
+        assert long_one.startswith(out[:-1])
